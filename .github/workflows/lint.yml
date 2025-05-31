@@ -1,0 +1,140 @@
+name: CTF Challenges YAML Linter
+
+# このファイルはユーザー向けのサンプルワークフローです
+# あなたのリポジトリにコピーして使用してください
+
+on:
+  # PRの作成時、challenges.yamlファイルが変更された場合
+  pull_request:
+    paths:
+      - "**/challenges.yaml"
+
+  # PR内で "@github clilint" とコメントした場合
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  lint-challenges:
+    # PRまたは特定のコメントの場合のみ実行
+    if: >
+      (github.event_name == 'pull_request') ||
+      (github.event_name == 'issue_comment' && 
+       github.event.issue.pull_request &&
+       contains(github.event.comment.body, '@github clilint'))
+
+    runs-on: ubuntu-latest
+    name: Lint CTF Challenges YAML
+
+    steps:
+      # コードをチェックアウト（full historyでgit diffを使用可能にする）
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.event.pull_request.head.sha || github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      # 変更されたディレクトリを検出
+      - name: Detect changed directories
+        id: changed-dirs
+        run: |
+          # PR情報の取得
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+          else
+            # コメントイベントの場合、PR情報を取得
+            PR_NUMBER="${{ github.event.issue.number }}"
+            BASE_SHA=$(gh pr view $PR_NUMBER --json baseRefOid --jq .baseRefOid)
+            HEAD_SHA=$(gh pr view $PR_NUMBER --json headRefOid --jq .headRefOid)
+          fi
+
+          echo "Comparing $BASE_SHA..$HEAD_SHA"
+          echo "PR Number: $PR_NUMBER"
+
+          # 変更されたファイルを取得
+          CHANGED_FILES=$(git diff --name-only $BASE_SHA..$HEAD_SHA)
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          # challenges.yamlを含むディレクトリを検索
+          CHANGED_DIRS=""
+          while IFS= read -r file; do
+            if [ -n "$file" ]; then
+              DIR=$(dirname "$file")
+              # このディレクトリまたは親ディレクトリにchallenges.yamlがあるかチェック
+              CURRENT_DIR="$DIR"
+              while [ "$CURRENT_DIR" != "." ] && [ "$CURRENT_DIR" != "/" ]; do
+                if [ -f "$CURRENT_DIR/challenges.yaml" ]; then
+                  CHANGED_DIRS="$CHANGED_DIRS $CURRENT_DIR"
+                  break
+                fi
+                CURRENT_DIR=$(dirname "$CURRENT_DIR")
+              done
+            fi
+          done <<< "$CHANGED_FILES"
+
+          # 直接変更されたchallenges.yamlファイルも追加
+          DIRECT_YAML_CHANGES=$(echo "$CHANGED_FILES" | grep "challenges\.yaml$" | xargs -I {} dirname {} || true)
+          if [ -n "$DIRECT_YAML_CHANGES" ]; then
+            CHANGED_DIRS="$CHANGED_DIRS $DIRECT_YAML_CHANGES"
+          fi
+
+          # 重複を削除
+          UNIQUE_DIRS=$(echo $CHANGED_DIRS | tr ' ' '\n' | sort -u | grep -v '^$' || true)
+
+          echo "Directories to lint:"
+          echo "$UNIQUE_DIRS"
+
+          if [ -n "$UNIQUE_DIRS" ]; then
+            DIRS_TO_LINT=$(echo "$UNIQUE_DIRS" | tr '\n' ' ' | sed 's/[[:space:]]*$//')
+            echo "dirs_to_lint=$DIRS_TO_LINT" >> $GITHUB_OUTPUT
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "dirs_to_lint=" >> $GITHUB_OUTPUT
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+          # PR番号を出力に追加
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 変更がある場合のみ以下を実行
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.21"
+          cache: true
+
+      - name: Download Go dependencies
+        run: go mod download
+
+      - name: Build linter
+        run: go build -o clilint .
+
+      # linter実行とPRコメント投稿
+      - name: Run linter and post comment
+        run: |
+          echo "Running CTF challenges.yaml linter..."
+          DIRS="${{ steps.changed-dirs.outputs.dirs_to_lint }}"
+          PR_NUMBER="${{ steps.changed-dirs.outputs.pr_number }}"
+
+          # 環境変数を設定
+          export PR_NUMBER="$PR_NUMBER"
+          export GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+          export GITHUB_REPOSITORY="${{ github.repository }}"
+
+          if [ -z "$DIRS" ]; then
+            echo "No directories with challenges.yaml files were changed."
+            ./clilint --comment-pr
+          else
+            echo "Linting directories: $DIRS"
+            ./clilint --comment-pr $DIRS
+          fi
