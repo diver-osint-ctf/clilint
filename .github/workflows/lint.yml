@@ -106,35 +106,34 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 変更がある場合のみ以下を実行
-      - name: Setup Go
-        uses: actions/setup-go@v4
+      # CTF Challenges YAML Linter アクションを実行
+      - name: Run CTF Challenges YAML Linter
+        id: linter
+        uses: diver-osint-ctf/clilint@v0.1.1
+        continue-on-error: false # lintエラー時にジョブを失敗させる
         with:
-          go-version: "1.21"
-          cache: true
+          # 変更されたディレクトリを指定（空の場合は全体をチェック）
+          directories: ${{ steps.changed-dirs.outputs.dirs_to_lint }}
+          # PRコメントを投稿
+          comment-pr: true
+          # config.yamlのパスを指定（デフォルト: config.yaml）
+          config-file: config.yaml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.changed-dirs.outputs.pr_number }}
 
-      - name: Download Go dependencies
-        run: go mod download
-
-      - name: Build linter
-        run: go build -o clilint .
-
-      # linter実行とPRコメント投稿
-      - name: Run linter and post comment
+      # linter結果の確認
+      - name: Check linting results
+        if: always() # linterステップが失敗してもこのステップを実行
         run: |
-          echo "Running CTF challenges.yaml linter..."
-          DIRS="${{ steps.changed-dirs.outputs.dirs_to_lint }}"
-          PR_NUMBER="${{ steps.changed-dirs.outputs.pr_number }}"
-
-          # 環境変数を設定
-          export PR_NUMBER="$PR_NUMBER"
-          export GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
-          export GITHUB_REPOSITORY="${{ github.repository }}"
-
-          if [ -z "$DIRS" ]; then
-            echo "No directories with challenges.yaml files were changed."
-            ./clilint --comment-pr
+          if [ "${{ steps.linter.outcome }}" = "failure" ]; then
+            echo "❌ Linting failed. The workflow will fail."
+            echo "Please fix the issues in challenges.yaml files and try again."
+            exit 1
+          elif [ "${{ steps.linter.outcome }}" = "success" ]; then
+            echo "✅ All linting checks passed successfully!"
           else
-            echo "Linting directories: $DIRS"
-            ./clilint --comment-pr $DIRS
+            echo "⚠️ Linter step outcome: ${{ steps.linter.outcome }}"
+            echo "Treating unexpected outcome as failure."
+            exit 1
           fi

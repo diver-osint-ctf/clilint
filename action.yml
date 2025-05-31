@@ -1,0 +1,93 @@
+name: "CTF Challenges YAML Linter"
+description: "Lint challenges.yaml files for ctfcli with comprehensive validation rules"
+author: "clilint"
+branding:
+  icon: "check-circle"
+  color: "green"
+
+inputs:
+  directories:
+    description: "Directories to lint (space-separated, default: current directory)"
+    required: false
+    default: "."
+
+  comment-pr:
+    description: "Post results as PR comment"
+    required: false
+    default: "false"
+
+  config-file:
+    description: "Path to config.yaml file"
+    required: false
+    default: "config.yaml"
+
+outputs:
+  result:
+    description: "Linting result (success/failure)"
+    value: ${{ steps.lint.outputs.result }}
+
+  errors-found:
+    description: "Whether any errors were found"
+    value: ${{ steps.lint.outputs.errors-found }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: "1.21"
+
+    - name: Download dependencies
+      shell: bash
+      run: |
+        cd "${{ github.action_path }}"
+        go mod download
+
+    - name: Build linter
+      shell: bash
+      run: |
+        cd "${{ github.action_path }}"
+        go build -o clilint .
+
+    - name: Run linter
+      id: lint
+      shell: bash
+      run: |
+        cd "${{ github.action_path }}"
+
+        # Copy linter to workspace for execution
+        cp clilint "${{ github.workspace }}/clilint"
+        cd "${{ github.workspace }}"
+
+        # Build command arguments
+        LINT_ARGS=""
+
+        if [ "${{ inputs.comment-pr }}" = "true" ]; then
+          LINT_ARGS="$LINT_ARGS --comment-pr"
+        fi
+
+        if [ -n "${{ inputs.config-file }}" ] && [ "${{ inputs.config-file }}" != "config.yaml" ]; then
+          LINT_ARGS="$LINT_ARGS --config ${{ inputs.config-file }}"
+        fi
+
+        # Parse directories
+        DIRECTORIES="${{ inputs.directories }}"
+        if [ -z "$DIRECTORIES" ] || [ "$DIRECTORIES" = "." ]; then
+          DIRECTORIES="."
+        fi
+
+        echo "Running: ./clilint $LINT_ARGS $DIRECTORIES"
+
+        # Run linter and capture exit code
+        if ./clilint $LINT_ARGS $DIRECTORIES; then
+          echo "result=success" >> $GITHUB_OUTPUT
+          echo "errors-found=false" >> $GITHUB_OUTPUT
+          echo "✅ All linting checks passed successfully!"
+          exit 0
+        else
+          echo "result=failure" >> $GITHUB_OUTPUT  
+          echo "errors-found=true" >> $GITHUB_OUTPUT
+          echo "❌ Linting failed. Please fix the issues above."
+          exit 1
+        fi
