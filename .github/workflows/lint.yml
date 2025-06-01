@@ -31,109 +31,38 @@ jobs:
     name: Lint CTF Challenges YAML
 
     steps:
-      # コードをチェックアウト（full historyでgit diffを使用可能にする）
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          ref: ${{ github.event.pull_request.head.sha || github.event.pull_request.head.ref }}
-          fetch-depth: 0
-
-      # 変更されたディレクトリを検出
-      - name: Detect changed directories
-        id: changed-dirs
+      - name: Set PR number
+        id: pr_number
         run: |
-          # PR情報の取得
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE_SHA="${{ github.event.pull_request.base.sha }}"
-            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-            PR_NUMBER="${{ github.event.pull_request.number }}"
-          else
-            # コメントイベントの場合、PR情報を取得
-            PR_NUMBER="${{ github.event.issue.number }}"
-            BASE_SHA=$(gh pr view $PR_NUMBER --json baseRefOid --jq .baseRefOid)
-            HEAD_SHA=$(gh pr view $PR_NUMBER --json headRefOid --jq .headRefOid)
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "PR_NUMBER=${{ github.event.number }}" >> $GITHUB_ENV
+          elif [[ "${{ github.event_name }}" == "issue_comment" ]]; then
+            echo "PR_NUMBER=${{ github.event.issue.number }}" >> $GITHUB_ENV
           fi
 
-          echo "Comparing $BASE_SHA..$HEAD_SHA"
-          echo "PR Number: $PR_NUMBER"
-
-          # 変更されたファイルを取得
-          CHANGED_FILES=$(git diff --name-only $BASE_SHA..$HEAD_SHA)
-          echo "Changed files:"
-          echo "$CHANGED_FILES"
-
-          # challenges.yamlを含むディレクトリを検索
-          CHANGED_DIRS=""
-          while IFS= read -r file; do
-            if [ -n "$file" ]; then
-              DIR=$(dirname "$file")
-              # このディレクトリまたは親ディレクトリにchallenges.yamlがあるかチェック
-              CURRENT_DIR="$DIR"
-              while [ "$CURRENT_DIR" != "." ] && [ "$CURRENT_DIR" != "/" ]; do
-                if [ -f "$CURRENT_DIR/challenges.yaml" ]; then
-                  CHANGED_DIRS="$CHANGED_DIRS $CURRENT_DIR"
-                  break
-                fi
-                CURRENT_DIR=$(dirname "$CURRENT_DIR")
-              done
-            fi
-          done <<< "$CHANGED_FILES"
-
-          # 直接変更されたchallenges.yamlファイルも追加
-          DIRECT_YAML_CHANGES=$(echo "$CHANGED_FILES" | grep "challenges\.yaml$" | xargs -I {} dirname {} || true)
-          if [ -n "$DIRECT_YAML_CHANGES" ]; then
-            CHANGED_DIRS="$CHANGED_DIRS $DIRECT_YAML_CHANGES"
+      - name: Get Branch
+        id: get_branch
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "BRANCH=${{ github.event.pull_request.head.ref }}" >> $GITHUB_ENV
+          elif [[ "${{ github.event_name }}" == "issue_comment" ]]; then
+            BRANCH_NAME=$(gh pr view ${{ env.PR_NUMBER }} --json headRefName --jq .headRefName --repo ${{ github.repository }})
+            echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_ENV
           fi
-
-          # 重複を削除
-          UNIQUE_DIRS=$(echo $CHANGED_DIRS | tr ' ' '\n' | sort -u | grep -v '^$' || true)
-
-          echo "Directories to lint:"
-          echo "$UNIQUE_DIRS"
-
-          if [ -n "$UNIQUE_DIRS" ]; then
-            DIRS_TO_LINT=$(echo "$UNIQUE_DIRS" | tr '\n' ' ' | sed 's/[[:space:]]*$//')
-            echo "dirs_to_lint=$DIRS_TO_LINT" >> $GITHUB_OUTPUT
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          else
-            echo "dirs_to_lint=" >> $GITHUB_OUTPUT
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          fi
-
-          # PR番号を出力に追加
-          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BRANCH_NAME }}
 
       # CTF Challenges YAML Linter アクションを実行
+      # 変更されたディレクトリの検出とlintingはアクション内で自動実行
       - name: Run CTF Challenges YAML Linter
         id: linter
-        uses: diver-osint-ctf/clilint@v0.1.1
-        continue-on-error: false # lintエラー時にジョブを失敗させる
+        uses: diver-osint-ctf/clilint@v0.1.3
         with:
-          # 変更されたディレクトリを指定（空の場合は全体をチェック）
-          directories: ${{ steps.changed-dirs.outputs.dirs_to_lint }}
-          # PRコメントを投稿
-          comment-pr: true
-          # config.yamlのパスを指定（デフォルト: config.yaml）
-          config-file: config.yaml
+          repository: ${{ github.repository }}
+          pr-number: ${{ env.PR_NUMBER }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ steps.changed-dirs.outputs.pr_number }}
-
-      # linter結果の確認
-      - name: Check linting results
-        if: always() # linterステップが失敗してもこのステップを実行
-        run: |
-          if [ "${{ steps.linter.outcome }}" = "failure" ]; then
-            echo "❌ Linting failed. The workflow will fail."
-            echo "Please fix the issues in challenges.yaml files and try again."
-            exit 1
-          elif [ "${{ steps.linter.outcome }}" = "success" ]; then
-            echo "✅ All linting checks passed successfully!"
-          else
-            echo "⚠️ Linter step outcome: ${{ steps.linter.outcome }}"
-            echo "Treating unexpected outcome as failure."
-            exit 1
-          fi

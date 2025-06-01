@@ -42,11 +42,12 @@ type LintResult struct {
 	Description string
 }
 
-type GitHubEnv struct {
-	Token    string
-	Owner    string
-	Repo     string
-	PRNumber int
+type Env struct {
+	token     string
+	owner     string
+	repo      string
+	prNumber  int
+	commentPR bool
 }
 
 func main() {
@@ -74,14 +75,56 @@ func main() {
 		}
 	}
 
-	// If no directories specified, use current directory
+	var allResults []LintResult
+
+	// GitHub Actions mode: detect changed directories
+	if commentPR {
+		env, err := getEnv()
+		if err != nil {
+			log.Fatalf("Error getting environment: %v", err)
+		}
+
+		changedDirs, err := findChangedDirectories(env)
+		if err != nil {
+			log.Fatalf("Error finding changed directories: %v", err)
+		}
+
+		if len(changedDirs) == 0 {
+			// No changes, post comment and exit
+			err = postNoChangesComment(env)
+			if err != nil {
+				log.Fatalf("Error posting comment: %v", err)
+			}
+			return
+		}
+
+		// Lint changed directories
+		for _, dir := range changedDirs {
+			results, err := lintChallenges(dir)
+			if err != nil {
+				log.Fatalf("Error linting directory %s: %v", dir, err)
+			}
+			allResults = append(allResults, results...)
+		}
+
+		// Post PR comment
+		hasErrors := hasLintErrors(allResults)
+		err = postPRComment(allResults, hasErrors, env)
+		if err != nil {
+			log.Fatalf("Error posting PR comment: %v", err)
+		}
+
+		if hasErrors {
+			os.Exit(1)
+		}
+		return
+	}
+
+	// Local mode: lint specified directories
 	if len(targetDirs) == 0 {
 		targetDirs = []string{"."}
 	}
 
-	var allResults []LintResult
-
-	// Lint each specified directory
 	for _, dir := range targetDirs {
 		results, err := lintChallenges(dir)
 		if err != nil {
@@ -90,25 +133,7 @@ func main() {
 		allResults = append(allResults, results...)
 	}
 
-	hasErrors := false
-	for _, result := range allResults {
-		if len(result.Errors) > 0 {
-			hasErrors = true
-			break
-		}
-	}
-
-	// Handle PR comment posting
-	if commentPR {
-		err := postPRComment(allResults, hasErrors)
-		if err != nil {
-			log.Fatalf("Error posting PR comment: %v", err)
-		}
-		if hasErrors {
-			os.Exit(1)
-		}
-		return
-	}
+	hasErrors := hasLintErrors(allResults)
 
 	// Handle JSON output
 	if jsonOutput {
@@ -146,38 +171,45 @@ func main() {
 	}
 }
 
-func getGitHubEnv() (*GitHubEnv, error) {
+func getEnv() (Env, error) {
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
-		return nil, fmt.Errorf("GITHUB_TOKEN environment variable is required")
+		return Env{}, fmt.Errorf("GITHUB_TOKEN environment variable is required")
 	}
 
-	repository := os.Getenv("GITHUB_REPOSITORY")
+	repository := os.Getenv("INPUT_REPOSITORY")
 	if repository == "" {
-		return nil, fmt.Errorf("GITHUB_REPOSITORY environment variable is required")
+		repository = os.Getenv("GITHUB_REPOSITORY")
+	}
+	if repository == "" {
+		return Env{}, fmt.Errorf("INPUT_REPOSITORY or GITHUB_REPOSITORY environment variable is required")
 	}
 
 	repoPath := strings.Split(repository, "/")
 	if len(repoPath) != 2 {
-		return nil, fmt.Errorf("invalid GITHUB_REPOSITORY format: %s", repository)
+		return Env{}, fmt.Errorf("invalid repository format: %s", repository)
 	}
 	owner, repo := repoPath[0], repoPath[1]
 
-	prNumber := 0
-	prNumberStr := os.Getenv("PR_NUMBER")
-	if prNumberStr != "" {
-		var err error
-		prNumber, err = strconv.Atoi(prNumberStr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid PR_NUMBER: %v", err)
-		}
+	prNumberStr := os.Getenv("INPUT_PR_NUMBER")
+	if prNumberStr == "" {
+		prNumberStr = os.Getenv("PR_NUMBER")
+	}
+	if prNumberStr == "" {
+		return Env{}, fmt.Errorf("INPUT_PR_NUMBER or PR_NUMBER environment variable is required")
 	}
 
-	return &GitHubEnv{
-		Token:    token,
-		Owner:    owner,
-		Repo:     repo,
-		PRNumber: prNumber,
+	prNumber, err := strconv.Atoi(prNumberStr)
+	if err != nil {
+		return Env{}, fmt.Errorf("invalid PR number: %v", err)
+	}
+
+	return Env{
+		token:     token,
+		owner:     owner,
+		repo:      repo,
+		prNumber:  prNumber,
+		commentPR: true,
 	}, nil
 }
 
@@ -189,6 +221,77 @@ func getGitHubClient(token string) (*github.Client, context.Context) {
 	tc := oauth2.NewClient(ctx, ts)
 	client := github.NewClient(tc)
 	return client, ctx
+}
+
+func findChangedDirectories(env Env) ([]string, error) {
+	client, ctx := getGitHubClient(env.token)
+
+	var allFiles []string
+	opt := &github.ListOptions{PerPage: 100}
+
+	for {
+		files, resp, err := client.PullRequests.ListFiles(ctx, env.owner, env.repo, env.prNumber, opt)
+		if err != nil {
+			return nil, fmt.Errorf("error getting PR files: %v", err)
+		}
+
+		for _, file := range files {
+			allFiles = append(allFiles, file.GetFilename())
+		}
+
+		if resp.NextPage == 0 {
+			break
+		}
+		opt.Page = resp.NextPage
+	}
+
+	// Find directories containing challenges.yaml files
+	dirSet := make(map[string]bool)
+
+	for _, file := range allFiles {
+		dir := filepath.Dir(file)
+
+		// Check if the file is challenges.yaml or if the directory contains challenges.yaml
+		if filepath.Base(file) == "challenges.yaml" {
+			dirSet[dir] = true
+		} else {
+			// Check parent directories for challenges.yaml
+			current := dir
+			for current != "." && current != "/" {
+				if _, err := os.Stat(filepath.Join(current, "challenges.yaml")); err == nil {
+					dirSet[current] = true
+					break
+				}
+				current = filepath.Dir(current)
+			}
+		}
+	}
+
+	var directories []string
+	for dir := range dirSet {
+		directories = append(directories, dir)
+	}
+
+	return directories, nil
+}
+
+func hasLintErrors(results []LintResult) bool {
+	for _, result := range results {
+		if len(result.Errors) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func postNoChangesComment(env Env) error {
+	commentBody := "## 📋 CTF Challenges YAML Linting Results\n\n🔍 No challenges.yaml files were affected by this PR.\n\nNo linting required for this change."
+	return createComment(env, commentBody)
+}
+
+func postPRComment(results []LintResult, hasErrors bool, env Env) error {
+	commentBody := generateCommentBody(results, hasErrors)
+	return createComment(env, commentBody)
 }
 
 func generateCommentBody(results []LintResult, hasErrors bool) string {
@@ -234,40 +337,19 @@ func generateCommentBody(results []LintResult, hasErrors bool) string {
 	return body.String()
 }
 
-func postPRComment(results []LintResult, hasErrors bool) error {
-	githubEnv, err := getGitHubEnv()
-	if err != nil {
-		return fmt.Errorf("failed to get GitHub environment: %v", err)
-	}
-
-	if githubEnv.PRNumber == 0 {
-		fmt.Println("No PR number specified, skipping comment posting")
-		return nil
-	}
-
-	if len(results) == 0 {
-		// Post no changes comment
-		commentBody := "## 📋 CTF Challenges YAML Linting Results\n\n🔍 No challenges.yaml files were affected by this PR.\n\nNo linting required for this change."
-		return createComment(githubEnv, commentBody)
-	}
-
-	commentBody := generateCommentBody(results, hasErrors)
-	return createComment(githubEnv, commentBody)
-}
-
-func createComment(githubEnv *GitHubEnv, body string) error {
-	client, ctx := getGitHubClient(githubEnv.Token)
+func createComment(env Env, body string) error {
+	client, ctx := getGitHubClient(env.token)
 
 	comment := &github.IssueComment{
 		Body: github.String(body),
 	}
 
-	_, _, err := client.Issues.CreateComment(ctx, githubEnv.Owner, githubEnv.Repo, githubEnv.PRNumber, comment)
+	_, _, err := client.Issues.CreateComment(ctx, env.owner, env.repo, env.prNumber, comment)
 	if err != nil {
 		return fmt.Errorf("failed to create comment: %v", err)
 	}
 
-	fmt.Printf("Successfully posted comment to PR #%d\n", githubEnv.PRNumber)
+	fmt.Printf("Successfully posted comment to PR #%d\n", env.prNumber)
 	return nil
 }
 
@@ -320,7 +402,7 @@ func lintChallengeFile(filePath string) LintResult {
 	// Lint checks
 	result.Errors = append(result.Errors, checkFiles(filePath, challenge.Files)...)
 	result.Errors = append(result.Errors, checkRequirements(challenge.Name, challenge.Requirements)...)
-	result.Errors = append(result.Errors, checkImage(challenge.Image, challenge.Host)...)
+	result.Errors = append(result.Errors, checkImage(challenge.Image)...)
 	result.Errors = append(result.Errors, checkState(challenge.State)...)
 	result.Errors = append(result.Errors, checkVersion(challenge.Version)...)
 	result.Errors = append(result.Errors, checkTags(challenge.Tags)...)
@@ -363,7 +445,7 @@ func checkRequirements(name string, requirements []string) []string {
 	return errors
 }
 
-func checkImage(image, host interface{}) []string {
+func checkImage(image interface{}) []string {
 	var errors []string
 
 	if image != nil {

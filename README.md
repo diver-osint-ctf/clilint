@@ -1,181 +1,127 @@
 # clilint - CTF Challenges YAML Linter
 
-A Go-based linter for [ctfcli](https://github.com/CTFd/ctfcli) challenges.yaml files, designed to run on GitHub Actions.
+A Go-based linter for [ctfcli](https://github.com/CTFd/ctfcli) challenges.yaml files with GitHub Actions integration and automatic PR commenting.
 
 ## Features
 
-This linter validates the following aspects of `challenges.yaml` files:
+- ✅ **YAML Format Validation**: Ensures valid YAML syntax
+- ✅ **File Existence Check**: Verifies files listed in `files` field exist
+- ✅ **Welcome Requirements**: Validates welcome dependencies for non-welcome challenges
+- ✅ **Field Validation**: Checks `image`, `state`, `version`, and `tags` fields
+- 🚀 **GitHub Integration**: Automatic PR detection and commenting
+- 🎯 **Smart Detection**: Only processes directories with changes
 
-- ✅ **YAML Format**: Ensures the file is valid YAML
-- ✅ **File Existence**: Verifies that files specified in the `files` field actually exist
-- ✅ **Welcome Requirements**: Checks that challenges without "welcome" in their name have "welcome" in their requirements
-- ✅ **Null Fields**: Ensures `image` and `host` fields are set to `null`
-- ✅ **State Validation**: Confirms `state` is set to "visible"
-- ✅ **Version Check**: Validates that `version` is set to "0.1"
-- ✅ **Tag Validation**: Ensures exactly one difficulty tag is present (`introduction`, `easy`, `medium`, or `hard`)
-- 🚀 **GitHub Integration**: Native PR comment posting with markdown support
-- 🎯 **Genre Filtering**: Automatically filters directories based on `config.yaml` genre list
+## GitHub Actions Usage
 
-## Configuration
+### Quick Setup
 
-### config.yaml
-
-The linter uses a `config.yaml` file to define valid challenge genres. Only directories matching these genre names will be processed.
+1. Add this workflow to `.github/workflows/lint.yml`:
 
 ```yaml
-genre:
-  - web
-  - misc
-  - osint
-  - crypto
-  - pwn
+name: CTF Challenges YAML Linter
+
+on:
+  pull_request:
+    paths: ["**/challenges.yaml"]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  lint-challenges:
+    if: >
+      (github.event_name == 'pull_request') ||
+      (github.event_name == 'issue_comment' && 
+       github.event.issue.pull_request &&
+       contains(github.event.comment.body, '@github clilint'))
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set PR number
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "PR_NUMBER=${{ github.event.number }}" >> $GITHUB_ENV
+          else
+            echo "PR_NUMBER=${{ github.event.issue.number }}" >> $GITHUB_ENV
+          fi
+
+      - name: Get Branch
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "BRANCH=${{ github.event.pull_request.head.ref }}" >> $GITHUB_ENV
+          else
+            BRANCH_NAME=$(gh pr view ${{ env.PR_NUMBER }} --json headRefName --jq .headRefName --repo ${{ github.repository }})
+            echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_ENV
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BRANCH_NAME }}
+
+      - name: Run CTF Challenges YAML Linter
+        uses: diver-osint-ctf/clilint@v0.1.3
+        with:
+          repository: ${{ github.repository }}
+          pr-number: ${{ env.PR_NUMBER }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-If a `config.yaml` file is not found or cannot be read, the linter will proceed without genre validation and process all directories.
+2. The linter automatically:
+   - ✅ Detects changed directories with `challenges.yaml` files
+   - ✅ Lints only affected challenges
+   - ✅ Posts detailed results as PR comments
+   - ✅ Triggers on PR changes or `@github clilint` comments
 
-## Installation & Usage
-
-### GitHub Actions Integration (Copy Sample Workflow)
-
-This repository includes a sample workflow file (`.github/workflows/lint.yml`) that you can copy to your repository. The workflow will automatically:
-
-- **Run on Pull Requests**: When `challenges.yaml` files are modified
-- **Run on Command**: When someone comments `@github clilint` on a Pull Request
-- **Smart Detection**: Only lints directories that contain changes
-- **Rich Comments**: Posts detailed results including challenge descriptions in markdown format
-- **Genre Filtering**: Only processes directories listed in `config.yaml`
-
-#### Setup Instructions
-
-1. Copy `.github/workflows/lint.yml` to your repository
-2. Create a `config.yaml` file in your repository root with your challenge genres
-3. The linter will automatically run on:
-   - Pull Requests that modify `challenges.yaml` files
-   - When someone comments `@github clilint` on a Pull Request
-
-#### Sample Workflow Features
-
-- 🎯 **Smart Change Detection**: Only processes directories with actual changes
-- 📝 **Markdown Display**: Shows challenge descriptions in full markdown format
-- 🚀 **Go-powered Comments**: Uses native Go GitHub API for efficient PR commenting
-- ⚡ **Streamlined**: Single binary handles linting and commenting
-- 🎪 **Genre Aware**: Respects `config.yaml` genre restrictions
-
-### Local Usage
-
-1. Clone this repository
-2. Build the binary:
-   ```bash
-   go build -o clilint .
-   ```
-3. Run the linter:
-   ```bash
-   ./clilint [directory]
-   ```
-
-## Usage
-
-### Command Line
+## Local Usage
 
 ```bash
-# Lint all challenges.yaml files in current directory and subdirectories
-./clilint
+# Install
+go install github.com/diver-osint-ctf/clilint@latest
 
-# Lint all challenges.yaml files in a specific directory
-./clilint /path/to/challenges
+# Lint current directory
+clilint
 
-# Lint multiple directories
-./clilint osint web crypto
+# Lint specific directories
+clilint web osint crypto
 
-# Output in JSON format
-./clilint --json
+# JSON output
+clilint --json
 
-# Post results as PR comment (requires GitHub environment variables)
-./clilint --comment-pr
-
-# Use custom config file
-./clilint --config my-config.yaml
-
-# Show help
-./clilint -h
+# Help
+clilint -h
 ```
 
-### GitHub Environment Variables
+## Validation Rules
 
-When using `--comment-pr`, the following environment variables are required:
-
-- `GITHUB_TOKEN`: GitHub personal access token or `${{ secrets.GITHUB_TOKEN }}`
-- `GITHUB_REPOSITORY`: Repository in format `owner/repo` or `${{ github.repository }}`
-- `PR_NUMBER`: Pull request number (optional for issue comments)
-
-## Expected Directory Structure
-
-The linter expects the following directory structure:
-
-```
-repository/
-├── config.yaml          # Genre definitions
-├── genre_1/             # Must match config.yaml genres
-│   ├── chall_1_1/
-│   │   ├── challenges.yaml
-│   │   └── public/
-│   │       └── challenge_files...
-│   ├── chall_1_2/
-│   │   └── challenges.yaml
-│   └── ...
-├── genre_2/             # Must match config.yaml genres
-│   ├── chall_2_1/
-│   │   └── challenges.yaml
-│   └── ...
-└── ...
-```
-
-## Genre Filtering Example
-
-With this `config.yaml`:
-
-```yaml
-genre:
-  - web
-  - osint
-  - misc
-```
-
-The linter will process:
-
-- ✅ `web/chall_1/challenges.yaml`
-- ✅ `osint/chall_2/challenges.yaml`
-- ✅ `misc/chall_3/challenges.yaml`
-
-But skip:
-
-- ❌ `crypto/chall_1/challenges.yaml` (not in config.yaml)
-- ❌ `invalid_genre/chall_1/challenges.yaml` (not in config.yaml)
+| Rule                   | Description                                                           |
+| ---------------------- | --------------------------------------------------------------------- |
+| **YAML Format**        | Must be valid YAML syntax                                             |
+| **File Existence**     | All files in `files[]` must exist                                     |
+| **Welcome Dependency** | Non-welcome challenges must include "welcome" in `requirements[]`     |
+| **Image Field**        | Must be `null`                                                        |
+| **State Field**        | Must be `"visible"`                                                   |
+| **Version Field**      | Must be `"0.1"`                                                       |
+| **Tags Field**         | Must contain exactly one of: `introduction`, `easy`, `medium`, `hard` |
 
 ## Example challenges.yaml
 
-Here's an example of a valid `challenges.yaml` file:
-
 ```yaml
-name: "example_challenge"
+name: "web_challenge"
 author: "author_name"
 category: "web"
-description: |
-  This is an example challenge description.
-
-  You can use **markdown** formatting here!
-
-  - List items
-  - [Links](https://example.com)
-  - Code blocks: `flag{example}`
-flags:
-  - "flag{example_flag}"
-tags:
-  - medium
-files:
-  - public/example.txt
-requirements:
-  - "welcome"
+description: "Challenge description with **markdown** support"
+flags: ["flag{example}"]
+tags: ["medium"]
+files: ["public/challenge.zip"]
+requirements: ["welcome"]
 value: 500
 type: dynamic
 extra:
@@ -188,9 +134,9 @@ state: visible
 version: "0.1"
 ```
 
-## Sample PR Comment Output
+## PR Comment Example
 
-When linting succeeds, the GitHub Action will post a comment like this:
+The linter posts rich markdown comments:
 
 ```markdown
 ## 🎉 CTF Challenges YAML Linting Results
@@ -199,101 +145,33 @@ When linting succeeds, the GitHub Action will post a comment like this:
 
 ### 📋 Checked Challenges in This PR:
 
-#### 🚩 **sample_chall** (`osint/chall_1/challenges.yaml`)
+#### 🚩 **web_challenge** (`web/chall1/challenges.yaml`)
 
-sample\_**description**
-
-[sample](https://example.com)
+Challenge description with **markdown** support
 
 ---
 
-✨ Great job! All challenges.yaml files in the changed directories follow the required format and standards.
-```
-
-## Testing
-
-Run the test suite:
-
-```bash
-go test -v
-```
-
-## Linting Rules
-
-### 1. YAML Format
-
-The file must be valid YAML syntax.
-
-### 2. File Existence
-
-All files listed in the `files` field must exist relative to the directory containing the `challenges.yaml` file.
-
-### 3. Welcome Requirements
-
-If the challenge name doesn't contain "welcome" (case-insensitive), the `requirements` field must include "welcome".
-
-### 4. Null Fields
-
-Both `image` and `host` fields must be set to `null`.
-
-### 5. State Field
-
-The `state` field must be set to "visible".
-
-### 6. Version Field
-
-The `version` field must be set to "0.1".
-
-### 7. Tags Field
-
-The `tags` field must contain exactly one of the following difficulty tags:
-
-- `introduction`
-- `easy`
-- `medium`
-- `hard`
-
-### 8. Genre Validation
-
-Directories must match one of the genres defined in `config.yaml`. If no config file is found, this validation is skipped.
-
-## Error Examples
-
-```
-❌ genre1/chall1/challenges.yaml:
-  - File specified in 'files' does not exist: missing.txt
-  - Challenges without 'welcome' in name must have 'welcome' in requirements
-  - Field 'image' should be null
-  - Field 'version' should be '0.1'
-  - Tags should contain exactly one of: introduction, easy, medium, hard
-
-Skipping crypto/chall1/challenges.yaml: genre 'crypto' not found in config.yaml
+✨ Great job! All challenges.yaml files follow the required format.
 ```
 
 ## Development
 
-### Building
-
 ```bash
+# Clone and build
+git clone https://github.com/diver-osint-ctf/clilint.git
+cd clilint
 go build -o clilint .
-```
 
-### Running Tests
-
-```bash
+# Run tests
 go test -v
+
+# Dependencies
+go mod tidy
 ```
-
-### Dependencies
-
-- Go 1.21+
-- `gopkg.in/yaml.v3` for YAML parsing
-- `github.com/google/go-github/v65/github` for GitHub API integration
-- `golang.org/x/oauth2` for OAuth2 authentication
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions welcome! Please submit a Pull Request.
 
 ## License
 

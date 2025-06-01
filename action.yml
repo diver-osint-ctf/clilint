@@ -6,20 +6,15 @@ branding:
   color: "green"
 
 inputs:
-  directories:
-    description: "Directories to lint (space-separated, default: current directory)"
+  repository:
+    description: "Repository name (owner/repo)"
     required: false
-    default: "."
+    default: ${{ github.repository }}
 
-  comment-pr:
-    description: "Post results as PR comment"
+  pr-number:
+    description: "Pull request number"
     required: false
-    default: "false"
-
-  config-file:
-    description: "Path to config.yaml file"
-    required: false
-    default: "config.yaml"
+    default: ${{ github.event.number }}
 
 outputs:
   result:
@@ -53,6 +48,10 @@ runs:
     - name: Run linter
       id: lint
       shell: bash
+      env:
+        INPUT_REPOSITORY: ${{ inputs.repository }}
+        INPUT_PR_NUMBER: ${{ inputs.pr-number }}
+        GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
       run: |
         cd "${{ github.action_path }}"
 
@@ -60,27 +59,10 @@ runs:
         cp clilint "${{ github.workspace }}/clilint"
         cd "${{ github.workspace }}"
 
-        # Build command arguments
-        LINT_ARGS=""
-
-        if [ "${{ inputs.comment-pr }}" = "true" ]; then
-          LINT_ARGS="$LINT_ARGS --comment-pr"
-        fi
-
-        if [ -n "${{ inputs.config-file }}" ] && [ "${{ inputs.config-file }}" != "config.yaml" ]; then
-          LINT_ARGS="$LINT_ARGS --config ${{ inputs.config-file }}"
-        fi
-
-        # Parse directories
-        DIRECTORIES="${{ inputs.directories }}"
-        if [ -z "$DIRECTORIES" ] || [ "$DIRECTORIES" = "." ]; then
-          DIRECTORIES="."
-        fi
-
-        echo "Running: ./clilint $LINT_ARGS $DIRECTORIES"
+        echo "Running: ./clilint --comment-pr"
 
         # Run linter and capture exit code
-        if ./clilint $LINT_ARGS $DIRECTORIES; then
+        if ./clilint --comment-pr; then
           echo "result=success" >> $GITHUB_OUTPUT
           echo "errors-found=false" >> $GITHUB_OUTPUT
           echo "✅ All linting checks passed successfully!"
