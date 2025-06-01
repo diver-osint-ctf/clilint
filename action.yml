@@ -1,5 +1,5 @@
 name: "CTF Challenges YAML Linter"
-description: "Lint challenges.yaml files for ctfcli with comprehensive validation rules"
+description: "Lint challenge.yml files for ctfcli with comprehensive validation rules"
 author: "clilint"
 branding:
   icon: "check-circle"

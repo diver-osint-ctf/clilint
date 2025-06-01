@@ -274,11 +274,11 @@ version: "0.1"
 				t.Fatalf("Failed to create test directory: %v", err)
 			}
 
-			// Create challenges.yaml file
-			yamlPath := filepath.Join(testDir, "challenges.yaml")
+			// Create challenge.yml file
+			yamlPath := filepath.Join(testDir, "challenge.yml")
 			err = os.WriteFile(yamlPath, []byte(tt.yamlContent), 0644)
 			if err != nil {
-				t.Fatalf("Failed to create challenges.yaml: %v", err)
+				t.Fatalf("Failed to create challenge.yml: %v", err)
 			}
 
 			// Create required files
@@ -360,10 +360,10 @@ host: null
 state: visible
 version: "0.1"
 `
-		yamlPath := filepath.Join(dirPath, "challenges.yaml")
+		yamlPath := filepath.Join(dirPath, "challenge.yml")
 		err = os.WriteFile(yamlPath, []byte(yamlContent), 0644)
 		if err != nil {
-			t.Fatalf("Failed to create challenges.yaml in %s: %v", dirPath, err)
+			t.Fatalf("Failed to create challenge.yml in %s: %v", dirPath, err)
 		}
 	}
 
@@ -373,7 +373,7 @@ version: "0.1"
 		t.Fatalf("lintChallenges failed: %v", err)
 	}
 
-	// Should find 3 challenges.yaml files
+	// Should find 3 challenge.yml files
 	if len(results) != 3 {
 		t.Errorf("Expected 3 results, got %d", len(results))
 	}
@@ -396,7 +396,7 @@ invalid yaml content:
     - formatted
 `
 
-	yamlPath := filepath.Join(tempDir, "challenges.yaml")
+	yamlPath := filepath.Join(tempDir, "challenge.yml")
 	err := os.WriteFile(yamlPath, []byte(invalidYAML), 0644)
 	if err != nil {
 		t.Fatalf("Failed to create invalid yaml file: %v", err)

@@ -15,7 +15,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Challenge represents the structure of challenges.yaml
+// Challenge represents the structure of challenge.yml
 type Challenge struct {
 	Name         string                 `yaml:"name"`
 	Author       string                 `yaml:"author"`
@@ -53,7 +53,7 @@ type Env struct {
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "-h" {
 		fmt.Println("Usage: clilint [options] [directory...]")
-		fmt.Println("Lints challenges.yaml files in the specified directories (default: current directory)")
+		fmt.Println("Lints challenge.yml files in the specified directories (default: current directory)")
 		fmt.Println("Options:")
 		fmt.Println("  --json           Output results in JSON format for GitHub Actions")
 		fmt.Println("  --comment-pr     Post results as PR comment (requires GitHub environment)")
@@ -167,7 +167,7 @@ func main() {
 	if hasErrors {
 		os.Exit(1)
 	} else {
-		fmt.Println("All challenges.yaml files passed linting! 🎉")
+		fmt.Println("All challenge.yml files passed linting! 🎉")
 	}
 }
 
@@ -245,20 +245,20 @@ func findChangedDirectories(env Env) ([]string, error) {
 		opt.Page = resp.NextPage
 	}
 
-	// Find directories containing challenges.yaml files
+	// Find directories containing challenge.yml files
 	dirSet := make(map[string]bool)
 
 	for _, file := range allFiles {
 		dir := filepath.Dir(file)
 
-		// Check if the file is challenges.yaml or if the directory contains challenges.yaml
-		if filepath.Base(file) == "challenges.yaml" {
+		// Check if the file is challenge.yml or if the directory contains challenge.yml
+		if filepath.Base(file) == "challenge.yml" {
 			dirSet[dir] = true
 		} else {
-			// Check parent directories for challenges.yaml
+			// Check parent directories for challenge.yml
 			current := dir
 			for current != "." && current != "/" {
-				if _, err := os.Stat(filepath.Join(current, "challenges.yaml")); err == nil {
+				if _, err := os.Stat(filepath.Join(current, "challenge.yml")); err == nil {
 					dirSet[current] = true
 					break
 				}
@@ -285,7 +285,7 @@ func hasLintErrors(results []LintResult) bool {
 }
 
 func postNoChangesComment(env Env) error {
-	commentBody := "## 📋 CTF Challenges YAML Linting Results\n\n🔍 No challenges.yaml files were affected by this PR.\n\nNo linting required for this change."
+	commentBody := "## 📋 CTF Challenges YAML Linting Results\n\n🔍 No challenge.yml files were affected by this PR.\n\nNo linting required for this change."
 	return createComment(env, commentBody)
 }
 
@@ -302,7 +302,7 @@ func generateCommentBody(results []LintResult, hasErrors bool) string {
 		body.WriteString("### 🔍 Linting Results for Changes in This PR:\n\n")
 	} else {
 		body.WriteString("## 🎉 CTF Challenges YAML Linting Results\n\n")
-		body.WriteString("✅ All affected challenges.yaml files passed linting!\n\n")
+		body.WriteString("✅ All affected challenge.yml files passed linting!\n\n")
 		body.WriteString("### 📋 Checked Challenges in This PR:\n\n")
 	}
 
@@ -331,7 +331,7 @@ func generateCommentBody(results []LintResult, hasErrors bool) string {
 	if hasErrors {
 		body.WriteString("⚠️ Please fix the issues above and try again.")
 	} else {
-		body.WriteString("✨ Great job! All challenges.yaml files in the changed directories follow the required format and standards.")
+		body.WriteString("✨ Great job! All challenge.yml files in the changed directories follow the required format and standards.")
 	}
 
 	return body.String()
@@ -361,7 +361,7 @@ func lintChallenges(rootDir string) ([]LintResult, error) {
 			return err
 		}
 
-		if info.Name() == "challenges.yaml" {
+		if info.Name() == "challenge.yml" {
 			result := lintChallengeFile(path)
 			results = append(results, result)
 		}

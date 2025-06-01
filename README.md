@@ -1,6 +1,6 @@
 # clilint - CTF Challenges YAML Linter
 
-A Go-based linter for [ctfcli](https://github.com/CTFd/ctfcli) challenges.yaml files with GitHub Actions integration and automatic PR commenting.
+A Go-based linter for [ctfcli](https://github.com/CTFd/ctfcli) challenge.yml files with GitHub Actions integration and automatic PR commenting.
 
 ## Features
 
@@ -15,67 +15,10 @@ A Go-based linter for [ctfcli](https://github.com/CTFd/ctfcli) challenges.yaml f
 
 ### Quick Setup
 
-1. Add this workflow to `.github/workflows/lint.yml`:
-
-```yaml
-name: CTF Challenges YAML Linter
-
-on:
-  pull_request:
-    paths: ["**/challenges.yaml"]
-  issue_comment:
-    types: [created]
-
-permissions:
-  contents: read
-  pull-requests: write
-  issues: write
-
-jobs:
-  lint-challenges:
-    if: >
-      (github.event_name == 'pull_request') ||
-      (github.event_name == 'issue_comment' && 
-       github.event.issue.pull_request &&
-       contains(github.event.comment.body, '@github clilint'))
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Set PR number
-        run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "PR_NUMBER=${{ github.event.number }}" >> $GITHUB_ENV
-          else
-            echo "PR_NUMBER=${{ github.event.issue.number }}" >> $GITHUB_ENV
-          fi
-
-      - name: Get Branch
-        run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "BRANCH=${{ github.event.pull_request.head.ref }}" >> $GITHUB_ENV
-          else
-            BRANCH_NAME=$(gh pr view ${{ env.PR_NUMBER }} --json headRefName --jq .headRefName --repo ${{ github.repository }})
-            echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_ENV
-          fi
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.BRANCH_NAME }}
-
-      - name: Run CTF Challenges YAML Linter
-        uses: diver-osint-ctf/clilint@v0.1.3
-        with:
-          repository: ${{ github.repository }}
-          pr-number: ${{ env.PR_NUMBER }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
+1. Add this workflow to [`.github/workflows/lint.yml`](./.github/workflows/lint.yml):
 
 2. The linter automatically:
-   - ✅ Detects changed directories with `challenges.yaml` files
+   - ✅ Detects changed directories with `challenge.yml` files
    - ✅ Lints only affected challenges
    - ✅ Posts detailed results as PR comments
    - ✅ Triggers on PR changes or `@github clilint` comments
@@ -111,7 +54,7 @@ clilint -h
 | **Version Field**      | Must be `"0.1"`                                                       |
 | **Tags Field**         | Must contain exactly one of: `introduction`, `easy`, `medium`, `hard` |
 
-## Example challenges.yaml
+## Example challenge.yml
 
 ```yaml
 name: "web_challenge"
@@ -141,17 +84,17 @@ The linter posts rich markdown comments:
 ```markdown
 ## 🎉 CTF Challenges YAML Linting Results
 
-✅ All affected challenges.yaml files passed linting!
+✅ All affected challenge.yml files passed linting!
 
 ### 📋 Checked Challenges in This PR:
 
-#### 🚩 **web_challenge** (`web/chall1/challenges.yaml`)
+#### 🚩 **web_challenge** (`web/chall1/challenge.yml`)
 
 Challenge description with **markdown** support
 
 ---
 
-✨ Great job! All challenges.yaml files follow the required format.
+✨ Great job! All challenge.yml files follow the required format.
 ```
 
 ## Development

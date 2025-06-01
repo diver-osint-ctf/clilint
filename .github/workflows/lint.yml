@@ -4,10 +4,10 @@ name: CTF Challenges YAML Linter
 # あなたのリポジトリにコピーして使用してください
 
 on:
-  # PRの作成時、challenges.yamlファイルが変更された場合
+  # PRの作成時、challenge.ymlファイルが変更された場合
   pull_request:
     paths:
-      - "**/challenges.yaml"
+      - "**/challenge.yml"
 
   # PR内で "@github clilint" とコメントした場合
   issue_comment:
@@ -60,7 +60,7 @@ jobs:
       # 変更されたディレクトリの検出とlintingはアクション内で自動実行
       - name: Run CTF Challenges YAML Linter
         id: linter
-        uses: diver-osint-ctf/clilint@v0.1.3
+        uses: diver-osint-ctf/clilint@v0.2.3
         with:
           repository: ${{ github.repository }}
           pr-number: ${{ env.PR_NUMBER }}
