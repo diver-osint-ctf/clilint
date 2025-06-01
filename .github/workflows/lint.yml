@@ -4,10 +4,9 @@ name: CTF Challenges YAML Linter
 # あなたのリポジトリにコピーして使用してください
 
 on:
-  # PRの作成時、challenge.ymlファイルが変更された場合
+  # PRの作成時
   pull_request:
-    paths:
-      - "**/challenge.yml"
+    types: [opened]
 
   # PR内で "@github clilint" とコメントした場合
   issue_comment:
