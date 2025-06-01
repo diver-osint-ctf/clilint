@@ -60,7 +60,7 @@ jobs:
       # 変更されたディレクトリの検出とlintingはアクション内で自動実行
       - name: Run CTF Challenges YAML Linter
         id: linter
-        uses: diver-osint-ctf/clilint@v0.2.3
+        uses: diver-osint-ctf/clilint@v0.3.0
         with:
           repository: ${{ github.repository }}
           pr-number: ${{ env.PR_NUMBER }}

@@ -6,6 +6,7 @@ A Go-based linter for [ctfcli](https://github.com/CTFd/ctfcli) challenge.yml fil
 
 - ✅ **YAML Format Validation**: Ensures valid YAML syntax
 - ✅ **File Existence Check**: Verifies files listed in `files` field exist
+- ✅ **File Size**: Checks that all files in `files[]` are 1.00 MB or smaller
 - ✅ **Welcome Requirements**: Validates welcome dependencies for non-welcome challenges
 - ✅ **Field Validation**: Checks `image`, `state`, `version`, and `tags` fields
 - 🚀 **GitHub Integration**: Automatic PR detection and commenting
@@ -48,6 +49,7 @@ clilint -h
 | ---------------------- | --------------------------------------------------------------------- |
 | **YAML Format**        | Must be valid YAML syntax                                             |
 | **File Existence**     | All files in `files[]` must exist                                     |
+| **File Size**          | All files in `files[]` must be 1.00 MB or smaller                     |
 | **Welcome Dependency** | Non-welcome challenges must include "welcome" in `requirements[]`     |
 | **Image Field**        | Must be `null`                                                        |
 | **State Field**        | Must be `"visible"`                                                   |

@@ -263,6 +263,34 @@ version: "0.1"
 			files:      []string{},
 			wantErrors: []string{"File specified in 'files' does not exist: missing.txt"},
 		},
+		{
+			name: "file too large",
+			yamlContent: `
+name: "welcome_challenge"
+author: "test"
+category: "intro"
+description: "test description"
+flags:
+  - "flag{test}"
+tags:
+  - introduction
+files:
+  - large_file.txt
+requirements: []
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 100
+  minimum: 100
+image: null
+host: null
+state: visible
+version: "0.1"
+`,
+			files:      []string{"large_file.txt:large"},
+			wantErrors: []string{"File 'large_file.txt' is too large"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -283,10 +311,30 @@ version: "0.1"
 
 			// Create required files
 			for _, fileName := range tt.files {
-				filePath := filepath.Join(testDir, fileName)
-				err = os.WriteFile(filePath, []byte("test content"), 0644)
-				if err != nil {
-					t.Fatalf("Failed to create test file %s: %v", fileName, err)
+				if strings.Contains(fileName, ":large") {
+					// Create a large file (over 1MB)
+					actualFileName := strings.Split(fileName, ":")[0]
+					filePath := filepath.Join(testDir, actualFileName)
+					file, err := os.Create(filePath)
+					if err != nil {
+						t.Fatalf("Failed to create large file %s: %v", actualFileName, err)
+					}
+					// Write 1.5MB of data
+					data := make([]byte, 1024*1024+1024*512) // 1.5MB
+					for i := range data {
+						data[i] = 'A'
+					}
+					_, err = file.Write(data)
+					file.Close()
+					if err != nil {
+						t.Fatalf("Failed to write large file %s: %v", actualFileName, err)
+					}
+				} else {
+					filePath := filepath.Join(testDir, fileName)
+					err = os.WriteFile(filePath, []byte("test content"), 0644)
+					if err != nil {
+						t.Fatalf("Failed to create test file %s: %v", fileName, err)
+					}
 				}
 			}
 

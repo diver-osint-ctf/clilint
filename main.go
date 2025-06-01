@@ -413,11 +413,21 @@ func lintChallengeFile(filePath string) LintResult {
 func checkFiles(challengePath string, files []string) []string {
 	var errors []string
 	baseDir := filepath.Dir(challengePath)
+	const maxFileSize = 1024 * 1024 // 1MB in bytes
 
 	for _, file := range files {
 		fullPath := filepath.Join(baseDir, file)
-		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+		fileInfo, err := os.Stat(fullPath)
+		if os.IsNotExist(err) {
 			errors = append(errors, fmt.Sprintf("File specified in 'files' does not exist: %s", file))
+		} else if err != nil {
+			errors = append(errors, fmt.Sprintf("Error accessing file: %s (%v)", file, err))
+		} else {
+			// Check file size
+			if fileInfo.Size() > maxFileSize {
+				sizeMB := float64(fileInfo.Size()) / (1024 * 1024)
+				errors = append(errors, fmt.Sprintf("File '%s' is too large: %.2f MB (maximum allowed: 1.00 MB)", file, sizeMB))
+			}
 		}
 	}
 
