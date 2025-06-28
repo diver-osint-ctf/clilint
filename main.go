@@ -417,18 +417,16 @@ func getDefaultLintConfig() *LintConfig {
 			Patterns: []Pattern{
 				{
 					Type:   "static",
-					Values: []string{"easy", "medium", "hard"},
+					Values: []string{"beginner", "easy", "medium", "hard"},
+				},
+				{
+					Type:   "regex",
+					Values: []string{"author:*"},
 				},
 			},
 		},
 		Requirements: Rule{
-			Condition: "and",
-			Patterns: []Pattern{
-				{
-					Type:   "static",
-					Values: []string{"welcome"},
-				},
-			},
+			Condition: "none",
 		},
 	}
 }
