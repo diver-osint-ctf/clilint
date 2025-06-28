@@ -24,25 +24,6 @@ A Go-based linter for [ctfcli](https://github.com/CTFd/ctfcli) challenge.yml fil
    - ✅ Posts detailed results as PR comments
    - ✅ Triggers on PR changes or `@github clilint` comments
 
-## Local Usage
-
-```bash
-# Install
-go install github.com/diver-osint-ctf/clilint@latest
-
-# Lint current directory
-clilint
-
-# Lint specific directories
-clilint web osint crypto
-
-# JSON output
-clilint --json
-
-# Help
-clilint -h
-```
-
 ## Validation Rules
 
 | Rule                   | Description                                                           |
@@ -79,6 +60,24 @@ state: visible
 version: "0.1"
 ```
 
+## Example lintrc.yaml
+
+[lintrc.yaml](./lintrc.yaml)
+
+```yaml
+tags:
+  condition: and
+  patterns:
+    - type: regex
+      values:
+        - "author: *"
+    - type: static
+      values:
+        - easy
+        - medium
+        - hard
+```
+
 ## PR Comment Example
 
 The linter posts rich markdown comments:
@@ -98,26 +97,3 @@ Challenge description with **markdown** support
 
 ✨ Great job! All challenge.yml files follow the required format.
 ```
-
-## Development
-
-```bash
-# Clone and build
-git clone https://github.com/diver-osint-ctf/clilint.git
-cd clilint
-go build -o clilint .
-
-# Run tests
-go test -v
-
-# Dependencies
-go mod tidy
-```
-
-## Contributing
-
-Contributions welcome! Please submit a Pull Request.
-
-## License
-
-MIT License

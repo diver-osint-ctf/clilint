@@ -11,6 +11,32 @@ func TestLintChallengeFile(t *testing.T) {
 	// Create a temporary directory for tests
 	tempDir := t.TempDir()
 
+	// Create lintrc.yaml in temp directory
+	lintrcContent := `tags:
+  condition: and
+  patterns:
+    - type: static
+      values:
+        - easy
+        - medium
+        - hard
+requirements:
+  condition: and
+  patterns:
+    - type: static
+      values:
+        - "welcome"`
+	lintrcPath := filepath.Join(tempDir, "lintrc.yaml")
+	err := os.WriteFile(lintrcPath, []byte(lintrcContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create lintrc.yaml: %v", err)
+	}
+
+	// Change to temp directory so lintrc.yaml is found
+	origDir, _ := os.Getwd()
+	defer os.Chdir(origDir)
+	os.Chdir(tempDir)
+
 	tests := []struct {
 		name        string
 		yamlContent string
@@ -27,7 +53,7 @@ description: "test description"
 flags:
   - "flag{test}"
 tags:
-  - introduction
+  - easy
 files: []
 requirements: []
 value: 500
@@ -54,7 +80,7 @@ description: "test description"
 flags:
   - "flag{test}"
 tags:
-  - introduction
+  - easy
 files: []
 requirements:
   - welcome
@@ -82,7 +108,7 @@ description: "test description"
 flags:
   - "flag{test}"
 tags:
-  - introduction
+  - easy
 files: []
 requirements: []
 value: 500
@@ -97,7 +123,7 @@ state: visible
 version: "0.1"
 `,
 			files:      []string{},
-			wantErrors: []string{"Challenges without 'welcome' in name must have 'welcome' in requirements"},
+			wantErrors: []string{"Requirements validation failed for pattern type 'static'"},
 		},
 		{
 			name: "non-null image",
@@ -109,7 +135,7 @@ description: "test description"
 flags:
   - "flag{test}"
 tags:
-  - introduction
+  - easy
 files: []
 requirements: []
 value: 500
@@ -136,7 +162,7 @@ description: "test description"
 flags:
   - "flag{test}"
 tags:
-  - introduction
+  - easy
 files: []
 requirements: []
 value: 500
@@ -163,7 +189,7 @@ description: "test description"
 flags:
   - "flag{test}"
 tags:
-  - introduction
+  - easy
 files: []
 requirements: []
 value: 500
@@ -205,7 +231,7 @@ state: visible
 version: "0.1"
 `,
 			files:      []string{},
-			wantErrors: []string{"Tags should contain exactly one of: introduction, easy, medium, hard"},
+			wantErrors: []string{"Tags should contain exactly one of: easy, medium, hard"},
 		},
 		{
 			name: "invalid tags - multiple valid tags",
@@ -217,8 +243,8 @@ description: "test description"
 flags:
   - "flag{test}"
 tags:
-  - introduction
   - easy
+  - medium
 files: []
 requirements: []
 value: 500
@@ -233,7 +259,7 @@ state: visible
 version: "0.1"
 `,
 			files:      []string{},
-			wantErrors: []string{"Tags should contain exactly one of: introduction, easy, medium, hard"},
+			wantErrors: []string{"Tags should contain exactly one of: easy, medium, hard"},
 		},
 		{
 			name: "missing file",
@@ -245,7 +271,7 @@ description: "test description"
 flags:
   - "flag{test}"
 tags:
-  - introduction
+  - easy
 files:
   - missing.txt
 requirements: []
@@ -273,7 +299,7 @@ description: "test description"
 flags:
   - "flag{test}"
 tags:
-  - introduction
+  - easy
 files:
   - large_file.txt
 requirements: []
@@ -372,6 +398,32 @@ func TestLintChallenges(t *testing.T) {
 	// Create a temporary directory structure
 	tempDir := t.TempDir()
 
+	// Create lintrc.yaml in temp directory
+	lintrcContent := `tags:
+  condition: and
+  patterns:
+    - type: static
+      values:
+        - easy
+        - medium
+        - hard
+requirements:
+  condition: and
+  patterns:
+    - type: static
+      values:
+        - "welcome"`
+	lintrcPath := filepath.Join(tempDir, "lintrc.yaml")
+	err := os.WriteFile(lintrcPath, []byte(lintrcContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create lintrc.yaml: %v", err)
+	}
+
+	// Change to temp directory so lintrc.yaml is found
+	origDir, _ := os.Getwd()
+	defer os.Chdir(origDir)
+	os.Chdir(tempDir)
+
 	// Create some test directories and files
 	dirs := []string{
 		"genre1/chall1",
@@ -394,7 +446,7 @@ description: "test description"
 flags:
   - "flag{test}"
 tags:
-  - introduction
+  - easy
 files: []
 requirements: []
 value: 500

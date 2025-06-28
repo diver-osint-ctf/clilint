@@ -35,6 +35,21 @@ type Challenge struct {
 	Hints        []interface{}          `yaml:"hints"`
 }
 
+type Pattern struct {
+	Type   string   `yaml:"type"`
+	Values []string `yaml:"values"`
+}
+
+type Rule struct {
+	Condition string    `yaml:"condition"`
+	Patterns  []Pattern `yaml:"patterns"`
+}
+
+type LintConfig struct {
+	Tags         Rule `yaml:"tags"`
+	Requirements Rule `yaml:"requirements"`
+}
+
 type LintResult struct {
 	File        string
 	Errors      []string
@@ -372,12 +387,65 @@ func lintChallenges(rootDir string) ([]LintResult, error) {
 	return results, err
 }
 
+func loadLintConfig() (*LintConfig, error) {
+	configPath := "lintrc.yaml"
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		configPath = filepath.Join(filepath.Dir(os.Args[0]), "lintrc.yaml")
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			return getDefaultLintConfig(), nil
+		}
+	}
+	
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read lintrc.yaml: %v", err)
+	}
+
+	var config LintConfig
+	err = yaml.Unmarshal(data, &config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse lintrc.yaml: %v", err)
+	}
+
+	return &config, nil
+}
+
+func getDefaultLintConfig() *LintConfig {
+	return &LintConfig{
+		Tags: Rule{
+			Condition: "and",
+			Patterns: []Pattern{
+				{
+					Type:   "static",
+					Values: []string{"easy", "medium", "hard"},
+				},
+			},
+		},
+		Requirements: Rule{
+			Condition: "and",
+			Patterns: []Pattern{
+				{
+					Type:   "static",
+					Values: []string{"welcome"},
+				},
+			},
+		},
+	}
+}
+
 func lintChallengeFile(filePath string) LintResult {
 	result := LintResult{
 		File:        filePath,
 		Errors:      []string{},
 		Name:        "",
 		Description: "",
+	}
+
+	// Load lint configuration
+	config, err := loadLintConfig()
+	if err != nil {
+		result.Errors = append(result.Errors, fmt.Sprintf("Failed to load lint config: %v", err))
+		return result
 	}
 
 	// Read file
@@ -401,11 +469,11 @@ func lintChallengeFile(filePath string) LintResult {
 
 	// Lint checks
 	result.Errors = append(result.Errors, checkFiles(filePath, challenge.Files)...)
-	result.Errors = append(result.Errors, checkRequirements(challenge.Name, challenge.Requirements)...)
+	result.Errors = append(result.Errors, checkRequirements(challenge, config.Requirements)...)
 	result.Errors = append(result.Errors, checkImage(challenge.Image)...)
 	result.Errors = append(result.Errors, checkState(challenge.State)...)
 	result.Errors = append(result.Errors, checkVersion(challenge.Version)...)
-	result.Errors = append(result.Errors, checkTags(challenge.Tags)...)
+	result.Errors = append(result.Errors, checkTags(challenge.Tags, config.Tags)...)
 
 	return result
 }
@@ -434,21 +502,19 @@ func checkFiles(challengePath string, files []string) []string {
 	return errors
 }
 
-func checkRequirements(name string, requirements []string) []string {
+func checkRequirements(challenge Challenge, reqRule Rule) []string {
 	var errors []string
 
-	// Check if name contains "welcome"
-	if !strings.Contains(strings.ToLower(name), "welcome") {
-		// Name doesn't contain "welcome", so requirements should include "welcome"
-		hasWelcome := false
-		for _, req := range requirements {
-			if strings.ToLower(req) == "welcome" {
-				hasWelcome = true
-				break
+	// If challenge name contains "welcome", skip requirements check
+	if strings.Contains(strings.ToLower(challenge.Name), "welcome") {
+		return errors
+	}
+
+	if reqRule.Condition == "and" {
+		for _, pattern := range reqRule.Patterns {
+			if !checkPatternMatch(challenge, pattern) {
+				errors = append(errors, fmt.Sprintf("Requirements validation failed for pattern type '%s'", pattern.Type))
 			}
-		}
-		if !hasWelcome {
-			errors = append(errors, "Challenges without 'welcome' in name must have 'welcome' in requirements")
 		}
 	}
 
@@ -485,23 +551,51 @@ func checkVersion(version string) []string {
 	return errors
 }
 
-func checkTags(tags []string) []string {
+func checkTags(tags []string, tagRule Rule) []string {
 	var errors []string
-	validTags := []string{"introduction", "easy", "medium", "hard"}
 
-	foundValidTags := []string{}
-	for _, tag := range tags {
-		for _, validTag := range validTags {
-			if tag == validTag {
-				foundValidTags = append(foundValidTags, tag)
-				break
+	if tagRule.Condition == "and" {
+		for _, pattern := range tagRule.Patterns {
+			switch pattern.Type {
+			case "static":
+				foundCount := 0
+				for _, tag := range tags {
+					for _, value := range pattern.Values {
+						if tag == value {
+							foundCount++
+							break
+						}
+					}
+				}
+				if foundCount != 1 {
+					errors = append(errors, fmt.Sprintf("Tags should contain exactly one of: %s", strings.Join(pattern.Values, ", ")))
+				}
 			}
 		}
 	}
 
-	if len(foundValidTags) != 1 {
-		errors = append(errors, "Tags should contain exactly one of: introduction, easy, medium, hard")
-	}
-
 	return errors
+}
+
+func checkPatternMatch(challenge Challenge, pattern Pattern) bool {
+	switch pattern.Type {
+	case "regex":
+		for _, value := range pattern.Values {
+			if strings.Contains(strings.ToLower(challenge.Author), strings.TrimSpace(strings.TrimSuffix(value, "*"))) {
+				return true
+			}
+		}
+		return false
+	case "static":
+		for _, req := range challenge.Requirements {
+			for _, value := range pattern.Values {
+				if strings.EqualFold(req, value) {
+					return true
+				}
+			}
+		}
+		return false
+	default:
+		return false
+	}
 }

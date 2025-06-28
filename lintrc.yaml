@@ -1,0 +1,18 @@
+tags:
+  # or, and, none
+  condition: and
+  patterns:
+    - type: regex
+      values:
+        - "author: *"
+    - type: static
+      values:
+        - easy
+        - medium
+        - hard
+requirements:
+  condition: and
+  patterns:
+    - type: static
+      values:
+        - "welcome"
