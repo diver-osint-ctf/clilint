@@ -317,6 +317,61 @@ version: "0.1"
 			files:      []string{"large_file.txt:large"},
 			wantErrors: []string{"File 'large_file.txt' is too large"},
 		},
+		{
+			name: "requirements condition none - no validation",
+			yamlContent: `
+name: "test_challenge"
+author: "test"
+category: "intro"
+description: "test description"
+flags:
+  - "flag{test}"
+tags:
+  - easy
+files: []
+requirements: []
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 100
+  minimum: 100
+image: null
+host: null
+state: visible
+version: "0.1"
+`,
+			files:      []string{},
+			wantErrors: []string{},
+		},
+		{
+			name: "tags condition none - no validation",
+			yamlContent: `
+name: "test_challenge"
+author: "test"
+category: "intro"
+description: "test description"
+flags:
+  - "flag{test}"
+tags:
+  - invalid_tag
+files: []
+requirements:
+  - welcome
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 100
+  minimum: 100
+image: null
+host: null
+state: visible
+version: "0.1"
+`,
+			files:      []string{},
+			wantErrors: []string{},
+		},
 	}
 
 	for _, tt := range tests {
@@ -326,6 +381,60 @@ version: "0.1"
 			err := os.MkdirAll(testDir, 0755)
 			if err != nil {
 				t.Fatalf("Failed to create test directory: %v", err)
+			}
+
+			// Create lintrc.yaml for this specific test
+			var lintrcContent string
+			if tt.name == "requirements condition none - no validation" {
+				lintrcContent = `tags:
+  condition: and
+  patterns:
+    - type: static
+      values:
+        - easy
+        - medium
+        - hard
+requirements:
+  condition: none
+  patterns:
+    - type: static
+      values:
+        - "welcome"`
+			} else if tt.name == "tags condition none - no validation" {
+				lintrcContent = `tags:
+  condition: none
+  patterns:
+    - type: static
+      values:
+        - easy
+        - medium
+        - hard
+requirements:
+  condition: and
+  patterns:
+    - type: static
+      values:
+        - "welcome"`
+			} else {
+				lintrcContent = `tags:
+  condition: and
+  patterns:
+    - type: static
+      values:
+        - easy
+        - medium
+        - hard
+requirements:
+  condition: and
+  patterns:
+    - type: static
+      values:
+        - "welcome"`
+			}
+			lintrcPath := filepath.Join(testDir, "lintrc.yaml")
+			err = os.WriteFile(lintrcPath, []byte(lintrcContent), 0644)
+			if err != nil {
+				t.Fatalf("Failed to create lintrc.yaml: %v", err)
 			}
 
 			// Create challenge.yml file
@@ -363,6 +472,11 @@ version: "0.1"
 					}
 				}
 			}
+
+			// Change to test directory so lintrc.yaml is found
+			origDir, _ := os.Getwd()
+			defer os.Chdir(origDir)
+			os.Chdir(testDir)
 
 			// Run linting
 			result := lintChallengeFile(yamlPath)

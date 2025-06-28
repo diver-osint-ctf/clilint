@@ -505,6 +505,11 @@ func checkFiles(challengePath string, files []string) []string {
 func checkRequirements(challenge Challenge, reqRule Rule) []string {
 	var errors []string
 
+	// If condition is "none", skip all validation
+	if reqRule.Condition == "none" {
+		return errors
+	}
+
 	// If challenge name contains "welcome", skip requirements check
 	if strings.Contains(strings.ToLower(challenge.Name), "welcome") {
 		return errors
@@ -553,6 +558,11 @@ func checkVersion(version string) []string {
 
 func checkTags(tags []string, tagRule Rule) []string {
 	var errors []string
+
+	// If condition is "none", skip all validation
+	if tagRule.Condition == "none" {
+		return errors
+	}
 
 	if tagRule.Condition == "and" {
 		for _, pattern := range tagRule.Patterns {
