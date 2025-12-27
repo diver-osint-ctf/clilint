@@ -1,6 +1,6 @@
 name: "CTF Challenges YAML Linter"
 description: "Lint challenge.yml files for ctfcli with comprehensive validation rules"
-author: "clilint"
+author: "diver-osint-ctf"
 branding:
   icon: "check-circle"
   color: "green"
@@ -29,7 +29,7 @@ runs:
   using: "composite"
   steps:
     - name: Setup Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v5
       with:
         go-version: "1.21"
 
