@@ -402,7 +402,7 @@ version: "0.1"
 `,
 			files:        []string{},
 			wantErrors:   []string{},
-			wantWarnings: []string{"Field 'type' is 'static', expected 'dynamic'"},
+			wantWarnings: []string{"Field 'type' is 'static', did you intend to use 'dynamic'?"},
 		},
 	}
 

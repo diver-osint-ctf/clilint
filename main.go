@@ -594,7 +594,7 @@ func checkType(challengeType string) []string {
 	var warnings []string
 
 	if challengeType == "static" {
-		warnings = append(warnings, "Field 'type' is 'static', expected 'dynamic'")
+		warnings = append(warnings, "Field 'type' is 'static', did you intend to use 'dynamic'?")
 	}
 
 	return warnings
