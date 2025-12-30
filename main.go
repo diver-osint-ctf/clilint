@@ -53,6 +53,7 @@ type LintConfig struct {
 type LintResult struct {
 	File        string
 	Errors      []string
+	Warnings    []string
 	Name        string
 	Description string
 }
@@ -173,9 +174,22 @@ func main() {
 			for _, err := range result.Errors {
 				fmt.Printf("  - %s\n", err)
 			}
+			if len(result.Warnings) > 0 {
+				for _, warn := range result.Warnings {
+					fmt.Printf("  ⚠️  %s\n", warn)
+				}
+			}
 			fmt.Println()
 		} else {
-			fmt.Printf("✅ %s: OK\n", result.File)
+			if len(result.Warnings) > 0 {
+				fmt.Printf("⚠️  %s:\n", result.File)
+				for _, warn := range result.Warnings {
+					fmt.Printf("  - %s\n", warn)
+				}
+				fmt.Println()
+			} else {
+				fmt.Printf("✅ %s: OK\n", result.File)
+			}
 		}
 	}
 
@@ -333,12 +347,32 @@ func generateCommentBody(results []LintResult, hasErrors bool) string {
 			for _, err := range result.Errors {
 				body.WriteString(fmt.Sprintf("- %s\n", err))
 			}
+			if len(result.Warnings) > 0 {
+				body.WriteString("\n**Warnings:**\n")
+				for _, warn := range result.Warnings {
+					body.WriteString(fmt.Sprintf("- ⚠️ %s\n", warn))
+				}
+			}
 			body.WriteString("\n---\n\n")
 		} else {
-			body.WriteString(fmt.Sprintf("#### 🚩 **%s** (`%s`)\n\n", result.Name, result.File))
-			if result.Description != "" {
-				body.WriteString(result.Description)
-				body.WriteString("\n\n---\n\n")
+			if len(result.Warnings) > 0 {
+				body.WriteString(fmt.Sprintf("#### ⚠️ **%s** (`%s`)\n\n", result.Name, result.File))
+				if result.Description != "" {
+					body.WriteString("**Description:**\n")
+					body.WriteString(result.Description)
+					body.WriteString("\n\n")
+				}
+				body.WriteString("**Warnings:**\n")
+				for _, warn := range result.Warnings {
+					body.WriteString(fmt.Sprintf("- %s\n", warn))
+				}
+				body.WriteString("\n---\n\n")
+			} else {
+				body.WriteString(fmt.Sprintf("#### 🚩 **%s** (`%s`)\n\n", result.Name, result.File))
+				if result.Description != "" {
+					body.WriteString(result.Description)
+					body.WriteString("\n\n---\n\n")
+				}
 			}
 		}
 	}
@@ -395,7 +429,7 @@ func loadLintConfig() (*LintConfig, error) {
 			return getDefaultLintConfig(), nil
 		}
 	}
-	
+
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read lintrc.yaml: %v", err)
@@ -435,6 +469,7 @@ func lintChallengeFile(filePath string) LintResult {
 	result := LintResult{
 		File:        filePath,
 		Errors:      []string{},
+		Warnings:    []string{},
 		Name:        "",
 		Description: "",
 	}
@@ -472,6 +507,7 @@ func lintChallengeFile(filePath string) LintResult {
 	result.Errors = append(result.Errors, checkState(challenge.State)...)
 	result.Errors = append(result.Errors, checkVersion(challenge.Version)...)
 	result.Errors = append(result.Errors, checkTags(challenge.Tags, config.Tags)...)
+	result.Warnings = append(result.Warnings, checkType(challenge.Type)...)
 
 	return result
 }
@@ -552,6 +588,16 @@ func checkVersion(version string) []string {
 	}
 
 	return errors
+}
+
+func checkType(challengeType string) []string {
+	var warnings []string
+
+	if challengeType == "static" {
+		warnings = append(warnings, "Field 'type' is 'static', expected 'dynamic'")
+	}
+
+	return warnings
 }
 
 func checkTags(tags []string, tagRule Rule) []string {
