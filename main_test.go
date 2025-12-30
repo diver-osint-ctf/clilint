@@ -34,8 +34,10 @@ requirements:
 
 	// Change to temp directory so lintrc.yaml is found
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(tempDir)
+	defer func() {
+		_ = os.Chdir(origDir)
+	}()
+	_ = os.Chdir(tempDir)
 
 	tests := []struct {
 		name         string
@@ -415,7 +417,8 @@ version: "0.1"
 
 			// Create lintrc.yaml for this specific test
 			var lintrcContent string
-			if tt.name == "requirements condition none - no validation" {
+			switch tt.name {
+			case "requirements condition none - no validation":
 				lintrcContent = `tags:
   condition: and
   patterns:
@@ -430,7 +433,7 @@ requirements:
     - type: static
       values:
         - "welcome"`
-			} else if tt.name == "tags condition none - no validation" {
+			case "tags condition none - no validation":
 				lintrcContent = `tags:
   condition: none
   patterns:
@@ -445,7 +448,7 @@ requirements:
     - type: static
       values:
         - "welcome"`
-			} else {
+			default:
 				lintrcContent = `tags:
   condition: and
   patterns:
@@ -490,10 +493,11 @@ requirements:
 						data[i] = 'A'
 					}
 					_, err = file.Write(data)
-					file.Close()
 					if err != nil {
+						_ = file.Close()
 						t.Fatalf("Failed to write large file %s: %v", actualFileName, err)
 					}
+					_ = file.Close()
 				} else {
 					filePath := filepath.Join(testDir, fileName)
 					err = os.WriteFile(filePath, []byte("test content"), 0644)
@@ -505,8 +509,10 @@ requirements:
 
 			// Change to test directory so lintrc.yaml is found
 			origDir, _ := os.Getwd()
-			defer os.Chdir(origDir)
-			os.Chdir(testDir)
+			defer func() {
+				_ = os.Chdir(origDir)
+			}()
+			_ = os.Chdir(testDir)
 
 			// Run linting
 			result := lintChallengeFile(yamlPath)
@@ -589,8 +595,10 @@ requirements:
 
 	// Change to temp directory so lintrc.yaml is found
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(tempDir)
+	defer func() {
+		_ = os.Chdir(origDir)
+	}()
+	_ = os.Chdir(tempDir)
 
 	// Create some test directories and files
 	dirs := []string{
