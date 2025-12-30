@@ -38,10 +38,11 @@ requirements:
 	os.Chdir(tempDir)
 
 	tests := []struct {
-		name        string
-		yamlContent string
-		files       []string
-		wantErrors  []string
+		name         string
+		yamlContent  string
+		files        []string
+		wantErrors   []string
+		wantWarnings []string
 	}{
 		{
 			name: "valid challenge",
@@ -369,8 +370,37 @@ host: null
 state: visible
 version: "0.1"
 `,
-			files:      []string{},
-			wantErrors: []string{},
+			files:        []string{},
+			wantErrors:   []string{},
+			wantWarnings: []string{},
+		},
+		{
+			name: "type static - should warn",
+			yamlContent: `
+name: "welcome_challenge"
+author: "test"
+category: "intro"
+description: "test description"
+flags:
+  - "flag{test}"
+tags:
+  - easy
+files: []
+requirements: []
+value: 500
+type: static
+extra:
+  initial: 500
+  decay: 100
+  minimum: 100
+image: null
+host: null
+state: visible
+version: "0.1"
+`,
+			files:        []string{},
+			wantErrors:   []string{},
+			wantWarnings: []string{"Field 'type' is 'static', expected 'dynamic'"},
 		},
 	}
 
@@ -500,6 +530,30 @@ requirements:
 						}
 						if !found {
 							t.Errorf("Expected error containing '%s' not found in: %v", wantError, result.Errors)
+						}
+					}
+				}
+			}
+
+			// Check warnings
+			if len(tt.wantWarnings) == 0 {
+				if len(result.Warnings) != 0 {
+					t.Errorf("Expected no warnings, but got: %v", result.Warnings)
+				}
+			} else {
+				if len(result.Warnings) == 0 {
+					t.Errorf("Expected warnings %v, but got none", tt.wantWarnings)
+				} else {
+					for _, wantWarning := range tt.wantWarnings {
+						found := false
+						for _, gotWarning := range result.Warnings {
+							if strings.Contains(gotWarning, wantWarning) {
+								found = true
+								break
+							}
+						}
+						if !found {
+							t.Errorf("Expected warning containing '%s' not found in: %v", wantWarning, result.Warnings)
 						}
 					}
 				}
