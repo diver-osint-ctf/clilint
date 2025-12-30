@@ -1,0 +1,24 @@
+name: "sample_chall"
+author: "xryuseix"
+category: "sample"
+description: |
+  sample_**description**
+
+  [sample](https://example.com)
+
+flags:
+  - "flag{sample_flag}"
+tags:
+  - easy
+requirements:
+  - "welcome"
+value: 500
+type: static
+extra:
+  initial: 500
+  decay: 100
+  minimum: 100
+image: null
+host: null
+state: visible
+version: "0.1"
