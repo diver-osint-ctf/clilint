@@ -1,0 +1,37 @@
+name: "sample_chall"
+author: "xryuseix"
+category: "sample"
+description: |
+  sample_**description**
+
+  [sample](https://example.com)
+
+flags:
+  - {
+      type: "static",
+      content: "flag{wat}",
+      data: "case_insensitive",
+    }
+  - {
+      type: "regex",
+      content: "(.*)STUFF(.*)",
+      data: "case_insensitive",
+    }
+  - {
+      type: "static",
+      content: "flag{wat}",
+    }
+tags:
+  - easy
+requirements:
+  - "welcome"
+value: 500
+type: static
+extra:
+  initial: 500
+  decay: 100
+  minimum: 100
+image: null
+host: null
+state: visible
+version: "0.1"

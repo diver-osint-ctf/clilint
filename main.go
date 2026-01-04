@@ -15,13 +15,50 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Flag represents a flag in challenge.yml (map format)
+type Flag struct {
+	Type    string  `yaml:"type"`    // required when using map format
+	Content string  `yaml:"content"` // required when using map format
+	Data    *string `yaml:"data"`    // optional
+}
+
+// FlagItem represents a single flag that can be either a string or a Flag struct
+type FlagItem struct {
+	StringValue *string
+	FlagValue   *Flag
+}
+
+// UnmarshalYAML implements custom unmarshaling for FlagItem
+// Accepts either a string or a map with type, content, and data fields
+func (f *FlagItem) UnmarshalYAML(value *yaml.Node) error {
+	// Check if it's a string scalar node
+	if value.Kind == yaml.ScalarNode && value.Tag == "!!str" {
+		var str string
+		if err := value.Decode(&str); err == nil {
+			f.StringValue = &str
+			return nil
+		}
+	}
+
+	// Check if it's a mapping node (object/map)
+	if value.Kind == yaml.MappingNode {
+		var flag Flag
+		if err := value.Decode(&flag); err == nil {
+			f.FlagValue = &flag
+			return nil
+		}
+	}
+
+	return fmt.Errorf("flag must be either a string or a map with type, content, and optional data fields")
+}
+
 // Challenge represents the structure of challenge.yml
 type Challenge struct {
 	Name         string                 `yaml:"name"`
 	Author       string                 `yaml:"author"`
 	Category     string                 `yaml:"category"`
 	Description  string                 `yaml:"description"`
-	Flags        []string               `yaml:"flags"`
+	Flags        []FlagItem             `yaml:"flags"`
 	Tags         []string               `yaml:"tags"`
 	Files        []string               `yaml:"files"`
 	Requirements []string               `yaml:"requirements"`

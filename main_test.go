@@ -404,6 +404,107 @@ version: "0.1"
 			wantErrors:   []string{},
 			wantWarnings: []string{"Field 'type' is 'static', did you intend to use 'dynamic'?"},
 		},
+		{
+			name: "flags as map with inline style",
+			yamlContent: `
+name: "welcome_challenge"
+author: "test"
+category: "intro"
+description: "test description"
+flags:
+  - {
+      type: "static",
+      content: "flag{wat}",
+      data: "case_insensitive",
+    }
+  - {
+      type: "regex",
+      content: "(.*)STUFF(.*)",
+      data: "case_insensitive",
+    }
+  - {
+      type: "static",
+      content: "flag{wat}",
+    }
+tags:
+  - easy
+files: []
+requirements: []
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 100
+  minimum: 100
+image: null
+host: null
+state: visible
+version: "0.1"
+`,
+			files:      []string{},
+			wantErrors: []string{},
+		},
+		{
+			name: "flags as map with multiline style",
+			yamlContent: `
+name: "welcome_challenge"
+author: "test"
+category: "intro"
+description: "test description"
+flags:
+  - type: static
+    content: "flag{wat}"
+    data: "case_insensitive"
+  - type: regex
+    content: "(.*)STUFF(.*)"
+    data: "case_insensitive"
+  - type: static
+    content: "flag{wat}"
+tags:
+  - easy
+files: []
+requirements: []
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 100
+  minimum: 100
+image: null
+host: null
+state: visible
+version: "0.1"
+`,
+			files:      []string{},
+			wantErrors: []string{},
+		},
+		{
+			name: "invalid flag format - number",
+			yamlContent: `
+name: "welcome_challenge"
+author: "test"
+category: "intro"
+description: "test description"
+flags:
+  - 123
+tags:
+  - easy
+files: []
+requirements: []
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 100
+  minimum: 100
+image: null
+host: null
+state: visible
+version: "0.1"
+`,
+			files:      []string{},
+			wantErrors: []string{"Invalid YAML format"},
+		},
 	}
 
 	for _, tt := range tests {
