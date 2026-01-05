@@ -126,7 +126,7 @@ state: visible
 version: "0.1"
 `,
 			files:      []string{},
-			wantErrors: []string{"Requirements validation failed for pattern type 'static'"},
+			wantErrors: []string{"Field 'requirements' must contain one of: welcome"},
 		},
 		{
 			name: "non-null image",

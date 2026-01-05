@@ -589,7 +589,7 @@ func checkRequirements(challenge Challenge, reqRule Rule) []string {
 	if reqRule.Condition == "and" {
 		for _, pattern := range reqRule.Patterns {
 			if !checkPatternMatch(challenge, pattern) {
-				errors = append(errors, fmt.Sprintf("Requirements validation failed for pattern type '%s'", pattern.Type))
+				errors = append(errors, fmt.Sprintf("Field 'requirements' must contain one of: %s", strings.Join(pattern.Values, ", ")))
 			}
 		}
 	}
