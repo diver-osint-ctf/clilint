@@ -630,8 +630,8 @@ func checkVersion(version string) []string {
 func checkType(challengeType string) []string {
 	var warnings []string
 
-	if challengeType == "static" {
-		warnings = append(warnings, "Field 'type' is 'static', did you intend to use 'dynamic'?")
+	if challengeType == "standard" {
+		warnings = append(warnings, "Field 'type' is 'standard', did you intend to use 'dynamic'?")
 	}
 
 	return warnings

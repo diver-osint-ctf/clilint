@@ -377,7 +377,7 @@ version: "0.1"
 			wantWarnings: []string{},
 		},
 		{
-			name: "type static - should warn",
+			name: "type standard - should warn",
 			yamlContent: `
 name: "welcome_challenge"
 author: "test"
@@ -390,7 +390,7 @@ tags:
 files: []
 requirements: []
 value: 500
-type: static
+type: standard
 extra:
   initial: 500
   decay: 100
@@ -402,7 +402,7 @@ version: "0.1"
 `,
 			files:        []string{},
 			wantErrors:   []string{},
-			wantWarnings: []string{"Field 'type' is 'static', did you intend to use 'dynamic'?"},
+			wantWarnings: []string{"Field 'type' is 'standard', did you intend to use 'dynamic'?"},
 		},
 		{
 			name: "flags as map with inline style",

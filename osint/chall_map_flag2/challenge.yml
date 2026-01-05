@@ -20,7 +20,7 @@ tags:
 requirements:
   - "welcome"
 value: 500
-type: static
+type: standard
 extra:
   initial: 500
   decay: 100
