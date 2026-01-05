@@ -80,6 +80,7 @@ type Pattern struct {
 type Rule struct {
 	Condition string    `yaml:"condition"`
 	Patterns  []Pattern `yaml:"patterns"`
+	Ignore    []string  `yaml:"ignore"`
 }
 
 type LintConfig struct {
@@ -581,9 +582,18 @@ func checkRequirements(challenge Challenge, reqRule Rule) []string {
 		return errors
 	}
 
-	// If challenge name contains "welcome", skip requirements check
-	if strings.Contains(strings.ToLower(challenge.Name), "welcome") {
-		return errors
+	// Check if challenge name should be ignored
+	ignoreList := reqRule.Ignore
+	if len(ignoreList) == 0 {
+		// Default to "welcome" if no ignore list is specified
+		ignoreList = []string{"welcome"}
+	}
+
+	challengeNameLower := strings.ToLower(challenge.Name)
+	for _, ignorePattern := range ignoreList {
+		if strings.Contains(challengeNameLower, strings.ToLower(ignorePattern)) {
+			return errors
+		}
 	}
 
 	if reqRule.Condition == "and" {

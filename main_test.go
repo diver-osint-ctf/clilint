@@ -505,6 +505,141 @@ version: "0.1"
 			files:      []string{},
 			wantErrors: []string{"Invalid YAML format"},
 		},
+		{
+			name: "ignore list with custom pattern - should skip requirements",
+			yamlContent: `
+name: "tutorial_challenge"
+author: "test"
+category: "intro"
+description: "test description"
+flags:
+  - "flag{test}"
+tags:
+  - easy
+files: []
+requirements: []
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 100
+  minimum: 100
+image: null
+host: null
+state: visible
+version: "0.1"
+`,
+			files:      []string{},
+			wantErrors: []string{},
+		},
+		{
+			name: "ignore list without match - should require requirements",
+			yamlContent: `
+name: "test_challenge"
+author: "test"
+category: "intro"
+description: "test description"
+flags:
+  - "flag{test}"
+tags:
+  - easy
+files: []
+requirements: []
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 100
+  minimum: 100
+image: null
+host: null
+state: visible
+version: "0.1"
+`,
+			files:      []string{},
+			wantErrors: []string{"Field 'requirements' must contain one of: welcome"},
+		},
+		{
+			name: "multiple ignore patterns - should skip for tutorial",
+			yamlContent: `
+name: "tutorial_osint"
+author: "test"
+category: "intro"
+description: "test description"
+flags:
+  - "flag{test}"
+tags:
+  - easy
+files: []
+requirements: []
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 100
+  minimum: 100
+image: null
+host: null
+state: visible
+version: "0.1"
+`,
+			files:      []string{},
+			wantErrors: []string{},
+		},
+		{
+			name: "ignore with case insensitive match",
+			yamlContent: `
+name: "WELCOME_challenge"
+author: "test"
+category: "intro"
+description: "test description"
+flags:
+  - "flag{test}"
+tags:
+  - easy
+files: []
+requirements: []
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 100
+  minimum: 100
+image: null
+host: null
+state: visible
+version: "0.1"
+`,
+			files:      []string{},
+			wantErrors: []string{},
+		},
+		{
+			name: "empty ignore list - defaults to welcome",
+			yamlContent: `
+name: "welcome_intro"
+author: "test"
+category: "intro"
+description: "test description"
+flags:
+  - "flag{test}"
+tags:
+  - easy
+files: []
+requirements: []
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 100
+  minimum: 100
+image: null
+host: null
+state: visible
+version: "0.1"
+`,
+			files:      []string{},
+			wantErrors: []string{},
+		},
 	}
 
 	for _, tt := range tests {
@@ -549,6 +684,91 @@ requirements:
     - type: static
       values:
         - "welcome"`
+			case "ignore list with custom pattern - should skip requirements":
+				lintrcContent = `tags:
+  condition: and
+  patterns:
+    - type: static
+      values:
+        - easy
+        - medium
+        - hard
+requirements:
+  condition: and
+  patterns:
+    - type: static
+      values:
+        - "welcome"
+  ignore:
+    - "tutorial"`
+			case "ignore list without match - should require requirements":
+				lintrcContent = `tags:
+  condition: and
+  patterns:
+    - type: static
+      values:
+        - easy
+        - medium
+        - hard
+requirements:
+  condition: and
+  patterns:
+    - type: static
+      values:
+        - "welcome"
+  ignore:
+    - "welcome"`
+			case "multiple ignore patterns - should skip for tutorial":
+				lintrcContent = `tags:
+  condition: and
+  patterns:
+    - type: static
+      values:
+        - easy
+        - medium
+        - hard
+requirements:
+  condition: and
+  patterns:
+    - type: static
+      values:
+        - "welcome"
+  ignore:
+    - "welcome"
+    - "tutorial"`
+			case "ignore with case insensitive match":
+				lintrcContent = `tags:
+  condition: and
+  patterns:
+    - type: static
+      values:
+        - easy
+        - medium
+        - hard
+requirements:
+  condition: and
+  patterns:
+    - type: static
+      values:
+        - "welcome"
+  ignore:
+    - "welcome"`
+			case "empty ignore list - defaults to welcome":
+				lintrcContent = `tags:
+  condition: and
+  patterns:
+    - type: static
+      values:
+        - easy
+        - medium
+        - hard
+requirements:
+  condition: and
+  patterns:
+    - type: static
+      values:
+        - "welcome"
+  ignore: []`
 			default:
 				lintrcContent = `tags:
   condition: and

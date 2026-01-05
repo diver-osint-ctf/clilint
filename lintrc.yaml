@@ -12,7 +12,6 @@ tags:
         - hard
 requirements:
   condition: and
-  patterns:
-    - type: static
-      values:
-        - "welcome"
+  patterns: []
+  ignore:
+    - "welcome"
