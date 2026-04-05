@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -196,7 +197,10 @@ func main() {
 			"results": allResults,
 		}
 
-		jsonData, _ := json.Marshal(output)
+		jsonData, err := json.Marshal(output)
+		if err != nil {
+			log.Fatalf("Failed to marshal JSON output: %v", err)
+		}
 		fmt.Println(string(jsonData))
 
 		if hasErrors {
@@ -493,7 +497,7 @@ func getDefaultLintConfig() *LintConfig {
 				},
 				{
 					Type:   "regex",
-					Values: []string{"author:*"},
+					Values: []string{`^author:.+$`},
 				},
 			},
 		},
@@ -591,7 +595,7 @@ func checkRequirements(challenge Challenge, reqRule Rule) []string {
 
 	challengeNameLower := strings.ToLower(challenge.Name)
 	for _, ignorePattern := range ignoreList {
-		if strings.Contains(challengeNameLower, strings.ToLower(ignorePattern)) {
+		if strings.HasPrefix(challengeNameLower, strings.ToLower(ignorePattern)) {
 			return errors
 		}
 	}
@@ -671,6 +675,27 @@ func checkTags(tags []string, tagRule Rule) []string {
 				if foundCount != 1 {
 					errors = append(errors, fmt.Sprintf("Tags should contain exactly one of: %s", strings.Join(pattern.Values, ", ")))
 				}
+			case "regex":
+				matched := false
+				for _, tag := range tags {
+					for _, value := range pattern.Values {
+						re, err := regexp.Compile(value)
+						if err != nil {
+							errors = append(errors, fmt.Sprintf("Invalid regex pattern '%s': %v", value, err))
+							continue
+						}
+						if re.MatchString(tag) {
+							matched = true
+							break
+						}
+					}
+					if matched {
+						break
+					}
+				}
+				if !matched {
+					errors = append(errors, fmt.Sprintf("Tags should contain at least one matching: %s", strings.Join(pattern.Values, ", ")))
+				}
 			}
 		}
 	}
@@ -681,9 +706,15 @@ func checkTags(tags []string, tagRule Rule) []string {
 func checkPatternMatch(challenge Challenge, pattern Pattern) bool {
 	switch pattern.Type {
 	case "regex":
-		for _, value := range pattern.Values {
-			if strings.Contains(strings.ToLower(challenge.Author), strings.TrimSpace(strings.TrimSuffix(value, "*"))) {
-				return true
+		for _, req := range challenge.Requirements {
+			for _, value := range pattern.Values {
+				re, err := regexp.Compile(value)
+				if err != nil {
+					continue
+				}
+				if re.MatchString(req) {
+					return true
+				}
 			}
 		}
 		return false

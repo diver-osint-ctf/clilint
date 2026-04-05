@@ -20,46 +20,57 @@ permissions:
 jobs:
   lint-challenges:
     # PRまたは特定のコメントの場合のみ実行
+    # issue_commentはリポジトリメンバー/コラボレーターのみ許可
     if: >
       (github.event_name == 'pull_request') ||
-      (github.event_name == 'issue_comment' && 
+      (github.event_name == 'issue_comment' &&
        github.event.issue.pull_request &&
-       contains(github.event.comment.body, '@github clilint'))
+       contains(github.event.comment.body, '@github clilint') &&
+       (github.event.comment.author_association == 'OWNER' ||
+        github.event.comment.author_association == 'MEMBER' ||
+        github.event.comment.author_association == 'COLLABORATOR'))
 
-    runs-on: ubuntu-latest
+    runs-on: [takumi-runner]
     name: Lint CTF Challenges YAML
 
     steps:
       - name: Set PR number
         id: pr_number
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_EVENT_NUMBER: ${{ github.event.number }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "PR_NUMBER=${{ github.event.number }}" >> $GITHUB_ENV
-          elif [[ "${{ github.event_name }}" == "issue_comment" ]]; then
-            echo "PR_NUMBER=${{ github.event.issue.number }}" >> $GITHUB_ENV
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            echo "PR_NUMBER=$PR_EVENT_NUMBER" >> $GITHUB_ENV
+          elif [[ "$EVENT_NAME" == "issue_comment" ]]; then
+            echo "PR_NUMBER=$ISSUE_NUMBER" >> $GITHUB_ENV
           fi
 
       - name: Get Branch
         id: get_branch
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "BRANCH=${{ github.event.pull_request.head.ref }}" >> $GITHUB_ENV
-          elif [[ "${{ github.event_name }}" == "issue_comment" ]]; then
-            BRANCH_NAME=$(gh pr view ${{ env.PR_NUMBER }} --json headRefName --jq .headRefName --repo ${{ github.repository }})
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            echo "BRANCH_NAME=$HEAD_REF" >> $GITHUB_ENV
+          elif [[ "$EVENT_NAME" == "issue_comment" ]]; then
+            BRANCH_NAME=$(gh pr view "$PR_NUMBER" --json headRefName --jq .headRefName --repo "$GH_REPO")
             echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_ENV
           fi
-        env:
-          GH_TOKEN: ${{ github.token }}
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           ref: ${{ env.BRANCH_NAME }}
-
+      
       # CTF Challenges YAML Linter アクションを実行
       # 変更されたディレクトリの検出とlintingはアクション内で自動実行
       - name: Run CTF Challenges YAML Linter
         id: linter
-        uses: diver-osint-ctf/clilint@v0.4.0
+        uses: diver-osint-ctf/clilint@8d4ec08e88e52128458b95f38d5f6998395b7277 # v0.4.0
         with:
           repository: ${{ github.repository }}
           pr-number: ${{ env.PR_NUMBER }}
