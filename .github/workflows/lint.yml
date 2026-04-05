@@ -30,7 +30,7 @@ jobs:
         github.event.comment.author_association == 'MEMBER' ||
         github.event.comment.author_association == 'COLLABORATOR'))
 
-    runs-on: [takumi-runner]
+    runs-on: ubuntu-latest
     name: Lint CTF Challenges YAML
 
     steps:
@@ -62,7 +62,7 @@ jobs:
             echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_ENV
           fi
 
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
           ref: ${{ env.BRANCH_NAME }}
       
