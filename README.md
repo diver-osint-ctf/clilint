@@ -35,7 +35,7 @@ A Go-based linter for [ctfcli](https://github.com/CTFd/ctfcli) challenge.yml fil
 | **Image Field**        | Must be `null`                                                        |
 | **State Field**        | Must be `"visible"`                                                   |
 | **Version Field**      | Must be `"0.1"`                                                       |
-| **Tags Field**         | Must contain exactly one of: `introduction`, `easy`, `medium`, `hard` |
+| **Tags Field**         | Must contain exactly one of: `beginner`, `easy`, `medium`, `hard` |
 
 ## Example challenge.yml
 
