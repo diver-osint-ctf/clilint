@@ -428,16 +428,48 @@ func generateCommentBody(results []LintResult, hasErrors bool) string {
 	return body.String()
 }
 
+func findExistingComment(env Env) (*int64, error) {
+	client, ctx := getGitHubClient(env.token)
+	opt := &github.IssueListCommentsOptions{
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
+	for {
+		comments, resp, err := client.Issues.ListComments(ctx, env.owner, env.repo, env.prNumber, opt)
+		if err != nil {
+			return nil, err
+		}
+		for _, comment := range comments {
+			if strings.Contains(comment.GetBody(), "CTF Challenges YAML Linting Results") {
+				id := comment.GetID()
+				return &id, nil
+			}
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		opt.Page = resp.NextPage
+	}
+	return nil, nil
+}
+
 func createComment(env Env, body string) error {
 	client, ctx := getGitHubClient(env.token)
-
 	comment := &github.IssueComment{
 		Body: github.String(body),
 	}
 
-	_, _, err := client.Issues.CreateComment(ctx, env.owner, env.repo, env.prNumber, comment)
+	existingID, err := findExistingComment(env)
 	if err != nil {
-		return fmt.Errorf("failed to create comment: %v", err)
+		return fmt.Errorf("error finding existing comment: %v", err)
+	}
+
+	if existingID != nil {
+		_, _, err = client.Issues.EditComment(ctx, env.owner, env.repo, *existingID, comment)
+	} else {
+		_, _, err = client.Issues.CreateComment(ctx, env.owner, env.repo, env.prNumber, comment)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to post comment: %v", err)
 	}
 
 	fmt.Printf("Successfully posted comment to PR #%d\n", env.prNumber)
